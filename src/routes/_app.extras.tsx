@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useExtras, eur } from "@/lib/data";
+import { useRoles } from "@/lib/roles";
+import { Navigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/extras")({
@@ -17,8 +19,12 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 function ExtrasPage() {
+  const { isAdmin, loading: rolesLoading } = useRoles();
   const { data } = useExtras();
   const qc = useQueryClient();
+
+  if (rolesLoading) return null;
+  if (!isAdmin) return <Navigate to="/today" />;
 
   const update = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: { name?: string; price?: number; active?: boolean } }) => {

@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/reservar-ok")({
   component: RedsysReturnPage,
@@ -15,6 +17,28 @@ export const Route = createFileRoute("/reservar-ok")({
 function RedsysReturnPage() {
   const { order, ko } = Route.useSearch();
   const failed = !!ko;
+
+  useEffect(() => {
+    if (!failed || !order) return;
+    (async () => {
+      // Payment failed/cancelled: mark the (still unpaid) reservation as
+      // "rejected" so it is kept for the record but no longer blocks the slot.
+      // The redsys-notification webhook also does this server-side; this is the
+      // client-side fallback for the browser redirect to URL_KO.
+      const { data } = await supabase
+        .from("reservations")
+        .select("id")
+        .eq("redsys_order", order)
+        .eq("deposit_paid", false)
+        .maybeSingle();
+      if (data?.id) {
+        await supabase
+          .from("reservations")
+          .update({ status: "rejected" })
+          .eq("id", data.id);
+      }
+    })();
+  }, [failed, order]);
 
   return (
     <div style={{

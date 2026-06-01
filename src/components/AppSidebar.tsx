@@ -34,15 +34,15 @@ const items = [
   { to: "/today", label: "Hoy", icon: Calendar },
   { to: "/calendar", label: "Calendario", icon: CalendarDays },
   { to: "/reservations", label: "Reservas", icon: ClipboardList },
-  { to: "/rooms", label: "Habitaciones", icon: DoorOpen },
-  { to: "/rates", label: "Tarifas", icon: Tag },
-  { to: "/extras", label: "Extras", icon: PackagePlus },
   { to: "/customers", label: "Clientes", icon: Users },
   { to: "/reports", label: "Informes", icon: BarChart3 },
 ] as const;
 
 const adminItems = [
   { to: "/admin/manual", label: "Reserva manual", icon: Wand2 },
+  { to: "/rooms", label: "Habitaciones", icon: DoorOpen },
+  { to: "/rates", label: "Tarifas", icon: Tag },
+  { to: "/extras", label: "Extras", icon: PackagePlus },
 ] as const;
 
 export function AppSidebar() {

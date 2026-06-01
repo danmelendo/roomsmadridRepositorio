@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { eur, STATUS_LABELS, STATUS_COLORS, useRooms } from "@/lib/data";
 import { NewReservationDialog } from "@/components/NewReservationDialog";
+import { ReservationExtrasInfo, type ReservationExtraItem } from "@/components/ReservationExtrasInfo";
 import { Plus, LogIn, LogOut, Clock } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,7 +30,7 @@ function TodayPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservations")
-        .select("*, rooms(id,name,building), customers(id,name,phone)")
+        .select("*, rooms(id,name,building), customers(id,name,phone), reservation_extras(qty,is_gift,bed_message,screen_message,extras(name,category))")
         .gte("start_at", today.toISOString())
         .lt("start_at", tomorrow.toISOString())
         .order("start_at");
@@ -120,6 +121,7 @@ function TodayPage() {
                       </Button>
                     )}
                   </div>
+                  <ReservationExtrasInfo items={(r as { reservation_extras?: ReservationExtraItem[] }).reservation_extras} />
                 </div>
               );
             })}

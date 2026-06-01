@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { eur, STATUS_LABELS, STATUS_COLORS } from "@/lib/data";
 import { NewReservationDialog } from "@/components/NewReservationDialog";
+import { ReservationExtrasInfo, type ReservationExtraItem } from "@/components/ReservationExtrasInfo";
 import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,7 +28,7 @@ function ReservationsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservations")
-        .select("*, rooms(id,name,building), customers(id,name,phone)")
+        .select("*, rooms(id,name,building), customers(id,name,phone), reservation_extras(qty,is_gift,bed_message,screen_message,extras(name,category))")
         .order("start_at", { ascending: false })
         .limit(200);
       if (error) throw error;
@@ -96,8 +97,10 @@ function ReservationsPage() {
                 {filtered?.map((r) => {
                   const s = new Date(r.start_at);
                   const e = new Date(r.end_at);
+                  const extraItems = (r as { reservation_extras?: ReservationExtraItem[] }).reservation_extras;
                   return (
-                    <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
+                    <Fragment key={r.id}>
+                    <tr className="border-b last:border-0 hover:bg-muted/30">
                       <td className="p-2">
                         <div>{s.toLocaleDateString("es-ES")}</div>
                         <div className="text-xs text-muted-foreground font-mono">
@@ -135,6 +138,14 @@ function ReservationsPage() {
                         )}
                       </td>
                     </tr>
+                    {extraItems?.length ? (
+                      <tr className="border-b last:border-0 bg-muted/10">
+                        <td colSpan={7} className="px-2 pb-2 pt-0">
+                          <ReservationExtrasInfo items={extraItems} />
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   );
                 })}
                 {!filtered?.length && (

@@ -35,38 +35,45 @@ function Calendar({
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
-  contactPhones?: { number: string }[];
+  contactPhones?: { number: string; href?: string }[];
 }) {
   const [showContactDialog, setShowContactDialog] = React.useState(false);
-  const [contactText, setContactText] = React.useState("");
-  const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
+  const [activePhones, setActivePhones] = React.useState<{ number: string; href?: string }[]>([]);
 
   const defaultClassNames = getDefaultClassNames();
 
-  const handleDayClick = (date: Date, modifiers: any, e: React.MouseEvent) => {
-    const dayOfWeek = date.getDay();
+  const isContactDay = (date: Date) => CONTACT_DAYS.includes(date.getDay());
 
-    if (CONTACT_DAYS.includes(dayOfWeek)) {
-      const phones = contactPhones?.map((p) => `📞 ${p.number}`).join("\n") ?? "📞 Contacta con nosotros";
-      setSelectedDate(date);
-      setContactText(phones);
+  const handleDayClick = (date: Date, modifiers: any, e: React.MouseEvent) => {
+    if (isContactDay(date)) {
+      setActivePhones(contactPhones ?? []);
       setShowContactDialog(true);
       return;
     }
-
     onDayClick?.(date, modifiers, e);
   };
+
+  // Intercept onSelect to prevent contact days from being selected
+  const originalOnSelect = (props as any).onSelect as ((...args: any[]) => void) | undefined;
+  const handleSelect = React.useCallback(
+    (...args: any[]) => {
+      const selectedDay: Date | undefined = args[1];
+      if (selectedDay && isContactDay(selectedDay)) return;
+      originalOnSelect?.(...args);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [originalOnSelect],
+  );
+  const { onSelect: _ignored, ...restProps } = props as any;
 
   return (
     <>
       <DayPicker
       showOutsideDays={showOutsideDays}
-      // ✅ FIX: Usar locale es de date-fns directamente, sin formatWeekdayName custom
-      // que causaba el desplazamiento visual
       locale={locale ?? es}
       weekStartsOn={weekStartsOn ?? 1}
       onDayClick={handleDayClick}
-      // ✅ FIX: Quitar disabled para esos días, solo interceptamos el click
+      onSelect={handleSelect}
       modifiers={{
         contactRequired: (date) => CONTACT_DAYS.includes(date.getDay()),
       }}
@@ -178,21 +185,36 @@ function Calendar({
         ),
         ...components,
       }}
-      {...props}
+      {...restProps}
       />
 
       <AlertDialog open={showContactDialog} onOpenChange={setShowContactDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>No es posible reservar online</AlertDialogTitle>
+            <AlertDialogTitle>Solo reserva por tlf o Whatsapp</AlertDialogTitle>
           </AlertDialogHeader>
-          <AlertDialogDescription>
-            Para reservar jueves, viernes o sábado no está disponible la reserva online.
-            Por favor, contáctenos para gestionar su reserva.
-            <div className="mt-3">
-              <div>📞 91 007 61 00</div>
-              <div>📞 685 066 656</div>
-              <div>✉️ reservas@roomsmadrid.es</div>
+          <AlertDialogDescription asChild>
+            <div>
+              <p>Los jueves, viernes y sábados solo aceptamos reservas por teléfono o WhatsApp.</p>
+              <div className="mt-4 flex flex-col gap-2">
+                {activePhones.length > 0 ? (
+                  activePhones.map((p, i) => {
+                    const waHref = `https://wa.me/${p.href?.replace(/[^0-9]/g, "") ?? p.number.replace(/[^0-9]/g, "")}`;
+                    return (
+                      <div key={i} className="flex items-center gap-3">
+                        <a href={p.href ?? `tel:${p.number.replace(/\s/g, "")}`} className="font-medium text-foreground hover:underline">
+                          📞 {p.number}
+                        </a>
+                        <a href={waHref} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline text-sm">
+                          WhatsApp
+                        </a>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="font-medium">📞 Contacta con nosotros</p>
+                )}
+              </div>
             </div>
           </AlertDialogDescription>
           <AlertDialogFooter>

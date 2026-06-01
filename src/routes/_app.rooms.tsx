@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRooms } from "@/lib/data";
+import { useRoles } from "@/lib/roles";
+import { Navigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Bath, Droplet, Pencil, Check, X } from "lucide-react";
 
@@ -29,11 +31,14 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function RoomsPage() {
+  const { isAdmin, loading: rolesLoading } = useRoles();
   const { data: rooms } = useRooms();
   const qc = useQueryClient();
-
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+
+  if (rolesLoading) return null;
+  if (!isAdmin) return <Navigate to="/today" />;
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {

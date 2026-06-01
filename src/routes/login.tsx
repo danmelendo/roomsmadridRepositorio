@@ -13,9 +13,8 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { session, loading, signIn, signUp } = useAuth();
+  const { session, loading, signIn } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -26,13 +25,10 @@ function LoginPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const fn = mode === "signin" ? signIn : signUp;
-    const { error } = await fn(email, password);
+    const { error } = await signIn(email, password);
     setBusy(false);
     if (error) {
       toast.error(error);
-    } else if (mode === "signup") {
-      toast.success("Cuenta creada. Revisa tu email para confirmar.");
     } else {
       navigate({ to: "/today" });
     }
@@ -46,9 +42,7 @@ function LoginPage() {
             <Hotel className="h-6 w-6" />
           </div>
           <CardTitle>Rooms Madrid · Recepción</CardTitle>
-          <CardDescription>
-            {mode === "signin" ? "Accede al panel interno" : "Crear cuenta de personal"}
-          </CardDescription>
+          <CardDescription>Accede al panel interno</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
@@ -58,18 +52,11 @@ function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "signin" ? "current-password" : "new-password"} />
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "..." : mode === "signin" ? "Entrar" : "Crear cuenta"}
+              {busy ? "..." : "Entrar"}
             </Button>
-            <button
-              type="button"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-              className="block w-full text-center text-sm text-muted-foreground hover:text-foreground"
-            >
-              {mode === "signin" ? "¿Primera vez? Crear cuenta" : "Ya tengo cuenta"}
-            </button>
           </form>
         </CardContent>
       </Card>

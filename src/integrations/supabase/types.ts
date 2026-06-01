@@ -268,30 +268,36 @@ export type Database = {
       }
       reservation_extras: {
         Row: {
+          bed_message: string | null
           created_at: string
           extra_id: string
           id: string
           is_gift: boolean
           qty: number
           reservation_id: string
+          screen_message: string | null
           unit_price: number
         }
         Insert: {
+          bed_message?: string | null
           created_at?: string
           extra_id: string
           id?: string
           is_gift?: boolean
           qty?: number
           reservation_id: string
+          screen_message?: string | null
           unit_price: number
         }
         Update: {
+          bed_message?: string | null
           created_at?: string
           extra_id?: string
           id?: string
           is_gift?: boolean
           qty?: number
           reservation_id?: string
+          screen_message?: string | null
           unit_price?: number
         }
         Relationships: [
@@ -333,7 +339,7 @@ export type Database = {
           room_id: string
           start_at: string
           status: Database["public"]["Enums"]["reservation_status"]
-          stripe_session_id: string | null
+          redsys_order: string | null
           third_person_surcharge: number
           total: number
           updated_at: string
@@ -360,7 +366,7 @@ export type Database = {
           room_id: string
           start_at: string
           status?: Database["public"]["Enums"]["reservation_status"]
-          stripe_session_id?: string | null
+          redsys_order?: string | null
           third_person_surcharge?: number
           total?: number
           updated_at?: string
@@ -387,7 +393,7 @@ export type Database = {
           room_id?: string
           start_at?: string
           status?: Database["public"]["Enums"]["reservation_status"]
-          stripe_session_id?: string | null
+          redsys_order?: string | null
           third_person_surcharge?: number
           total?: number
           updated_at?: string
@@ -519,6 +525,8 @@ export type Database = {
         | "completed"
         | "cancelled"
         | "no_show"
+        | "pending"
+        | "rejected"
       room_status: "available" | "occupied" | "cleaning" | "out_of_service"
     }
     CompositeTypes: {
@@ -663,6 +671,8 @@ export const Constants = {
         "completed",
         "cancelled",
         "no_show",
+        "pending",
+        "rejected",
       ],
       room_status: ["available", "occupied", "cleaning", "out_of_service"],
     },

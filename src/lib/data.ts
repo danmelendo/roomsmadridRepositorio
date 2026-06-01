@@ -27,18 +27,22 @@ export const DURATION_LABELS: Record<number, string> = {
   360: "6h",
 };
 export const STATUS_LABELS: Record<string, string> = {
+  pending: "Pendiente de pago",
   confirmed: "Confirmada",
   in_progress: "En curso",
   completed: "Finalizada",
   cancelled: "Cancelada",
   no_show: "No-show",
+  rejected: "Rechazada",
 };
 export const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
   confirmed: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
   in_progress: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
   completed: "bg-muted text-muted-foreground border-border",
   cancelled: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 line-through",
   no_show: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30",
+  rejected: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30",
 };
 
 export function useRooms() {

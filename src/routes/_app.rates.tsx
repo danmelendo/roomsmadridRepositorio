@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useRateGroups, useDynamicRules, eur, DURATION_LABELS } from "@/lib/data";
+import { useRoles } from "@/lib/roles";
+import { Navigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -20,8 +22,12 @@ export const Route = createFileRoute("/_app/rates")({
 });
 
 function RatesPage() {
+  const { isAdmin, loading: rolesLoading } = useRoles();
   const { data: groups } = useRateGroups();
   const [groupId, setGroupId] = useState<string>("");
+
+  if (rolesLoading) return null;
+  if (!isAdmin) return <Navigate to="/today" />;
 
   const currentGroup = groups?.find((g) => g.id === groupId) ?? groups?.[0];
   const effectiveId = currentGroup?.id ?? "";

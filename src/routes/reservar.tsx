@@ -28,21 +28,22 @@ import extraDecoration from "@/assets/extra-decoration.jpg";
 // Map to dynamically resolve room images from /public/imagenes
 const ROOM_IMAGES_MAP: Record<string, Record<string, string>> = {
   bernabeu: {
-    "Grey": "/imagenes/Bernabeu/Grey/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-grey-7.webp",
+    "Grey": "/imagenes/Bernabeu/Grey/greybernabeu.jpeg",
     "Ocean": "/imagenes/Bernabeu/Ocean/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-ocean-1.webp",
     "Paris": "/imagenes/Bernabeu/Paris/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-paris-4.webp",
     "Safari": "/imagenes/Bernabeu/Safari/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-safari-4.webp",
-    "Tokio": "/imagenes/Bernabeu/Tokio/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-tokio-1.webp",
+    "Tokyo": "/imagenes/Bernabeu/Tokio/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-tokio-1.webp",
   },
   ventas: {
     "Empire State": "/imagenes/Ventas/Empire State/habitacion-romantica-hotel-madrid-ventas-empire-state-2.webp",
     "Grey": "/imagenes/Ventas/Grey/habitacion-romantica-hotel-madrid-ventas-grey-1-ver.webp",
     "Hollywood": "/imagenes/Ventas/Hollywood/habitacion-romantica-hotel-madrid-ventas-hollywood.webp",
     "Music": "/imagenes/Ventas/Music/habitacion-romantica-hotel-madrid-ventas-music-2.webp",
-    "Route 66": "/imagenes/Ventas/Route 66/habitacion-romantica-hotel-madrid-ventas-ruta.webp",
+    "Route 66": "/imagenes/Ventas/Route 66/ruta66nueva.jpeg",
   },
   america: {
-    "Dubai": "/imagenes/America/Dubai/habitacion-dubai-05--motel-por-horas-madrid.webp",
+    "Dubai": "/imagenes/America/Dubai/Dubainueva.jpeg",
+    "Grey": "/imagenes/America/Grey/grey-america-02.webp",
     "Maldivas": "/imagenes/America/Maldivas/maldivas-03--hoteles-para-parejas-baratos.webp",
     "New York": "/imagenes/America/New York/nueva-york-04--reservar-habitaciones-por-horas-en-madrid.webp",
     "Tu y yo": "/imagenes/America/Tu y yo/tu-y-yo-galeria-05--hoteles-para-parejas-en-madrid.webp",
@@ -105,6 +106,34 @@ const EXTRA_CATEGORY_LABELS: Record<string, string> = {
   hookah: "Cachimba",
   accessories: "Accesorios",
 };
+
+// Decorations above the basic "Especial" (20 €) — i.e. Plus (30 €), Premium
+// (50 €) and Premium Deluxe (145 €) — include personalised phrases that staff
+// set up in the room, so the customer must enter them when selecting one.
+const DECORATION_FREE_MESSAGE_MAX_PRICE = 20;
+const BED_MESSAGE_MAX_WORDS = 2;
+const SCREEN_MESSAGE_MAX_WORDS = 10;
+
+function decorationNeedsMessage(ex: ExtraLite) {
+  return ex.category === "decoration" && Number(ex.price) > DECORATION_FREE_MESSAGE_MAX_PRICE;
+}
+
+// Debug discount code: reduces the total by 99.9% so the Redsys deposit drops to
+// the gateway minimum (0.01 €), letting us test the real TPV with a tiny charge.
+// NOTE: validated client-side only — it is visible in the JS bundle and amounts
+// are not enforced server-side. Remove/disable before opening real sales.
+const DEBUG_DISCOUNT_CODE = "RMDEBUG999";
+const DEBUG_DISCOUNT_PCT = 0.999;
+const REDSYS_MIN_EUR = 0.01;
+
+function countWords(s: string) {
+  return s.trim().split(/\s+/).filter(Boolean).length;
+}
+
+interface DecoMessage {
+  bed: string;
+  screen: string;
+}
 
 const STEPS = [
   { key: "search", label: "Buscar" },
@@ -682,6 +711,33 @@ const CSS = `
     border-top: 1px solid rgba(184,151,90,0.2);
   }
   .rm-footer strong { color: var(--gold-light); }
+
+  /* Decoration message inputs */
+  .rm-deco-msg {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .rm-deco-msg-field { display: flex; flex-direction: column; gap: 4px; }
+  .rm-deco-msg-label {
+    font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    font-weight: 500; color: var(--gold-dark);
+  }
+  .rm-deco-msg-input {
+    width: 100%;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--ink);
+    background: var(--warm-white);
+  }
+  .rm-deco-msg-input:focus { outline: none; border-color: var(--gold); }
+  .rm-deco-msg-input.rm-invalid { border-color: #c0392b; background: rgba(192,57,43,0.05); }
+  .rm-deco-msg-hint { font-size: 10px; color: var(--ink-soft); }
+  .rm-deco-msg-hint.rm-over { color: #c0392b; }
 `;
 
 // ─────────────────────────────────────────────
@@ -705,6 +761,11 @@ function PublicReservePage() {
 
   // extras (shared across rooms in search, then locked after select)
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
+  // Personalised phrases per decoration extra id (bed + glass/LED screen)
+  const [decoMessages, setDecoMessages] = useState<Record<string, DecoMessage>>({});
+  // Discount code (debug): see DEBUG_DISCOUNT_CODE
+  const [discountInput, setDiscountInput] = useState("");
+  const [discountPct, setDiscountPct] = useState(0);
 
   // customer
   const [customerName, setCustomerName] = useState("");
@@ -720,6 +781,7 @@ function PublicReservePage() {
   const roomsRef = useRef<HTMLDivElement>(null);
   const isFirstHistoryEntry = useRef(true);
   const handlingPop = useRef(false);
+  const payingGuard = useRef(false);
 
   const startAt = useMemo(() => (date && time ? new Date(`${date}T${time}:00`) : null), [date, time]);
   const overnightAllowed = startAt ? isOvernightAllowed(startAt) : false;
@@ -795,14 +857,16 @@ function PublicReservePage() {
       if (!startAt || !endAt) return new Set<string>();
       const padStart = new Date(startAt.getTime() - 15 * 60_000);
       const padEnd = new Date(endAt.getTime() + 15 * 60_000);
+      const sixtyMinutesAgo = new Date(Date.now() - 60 * 60_000).toISOString();
       const { data, error } = await supabase
-        .from("reservations").select("room_id,status")
+        .from("reservations").select("room_id,status,deposit_paid,created_at")
         .gte("end_at", padStart.toISOString())
-        .lte("start_at", padEnd.toISOString());
+        .lte("start_at", padEnd.toISOString())
+        .or(`deposit_paid.eq.true,created_at.gte.${sixtyMinutesAgo}`);
       if (error) throw error;
       const blocked = new Set<string>();
       for (const r of data ?? []) {
-        if (r.status === "cancelled" || r.status === "no_show") continue;
+        if (r.status === "cancelled" || r.status === "no_show" || r.status === "rejected") continue;
         blocked.add(r.room_id);
       }
       return blocked;
@@ -918,39 +982,54 @@ function PublicReservePage() {
 
   const createReservation = async () => {
     if (!room || !startAt || !endAt || !breakdown) return;
+    if (payingGuard.current) return;
+    payingGuard.current = true;
     setPaying(true);
+    let createdReservationId: string | null = null;
     try {
-      let customerId: string | null = null;
-      const { data: existing } = await supabase.from("customers").select("id").eq("email", customerEmail).maybeSingle();
-      if (existing) {
-        customerId = existing.id;
-        await supabase.from("customers").update({ name: customerName, phone: customerPhone || null, no_contact: noContact }).eq("id", customerId);
-      } else {
-        const { data: c, error } = await supabase.from("customers").insert({ name: customerName, email: customerEmail, phone: customerPhone || null, no_contact: noContact }).select("id").single();
-        if (error) throw error;
-        customerId = c.id;
-      }
-      const total = breakdown.total;
-      const deposit = Math.round(total * 0.3 * 100) / 100;
+      // Find-or-create customer by email (SECURITY DEFINER RPC) to avoid
+      // duplicate customer rows from repeated public bookings.
+      const { data: customerId, error: customerErr } = await supabase.rpc(
+        "find_or_create_customer" as never,
+        {
+          p_name: customerName,
+          p_email: customerEmail,
+          p_phone: customerPhone || null,
+          p_no_contact: noContact,
+        } as never,
+      );
+      if (customerErr || !customerId) throw customerErr ?? new Error("No se pudo registrar el cliente");
+
+      const total = payableTotal;
+      const deposit = depositAmount;
       const { data: reservation, error: rerr } = await supabase.from("reservations").insert({
-        room_id: room.id, customer_id: customerId,
+        room_id: room.id, customer_id: customerId as unknown as string,
         start_at: startAt.toISOString(), end_at: endAt.toISOString(),
         with_jacuzzi: room.jacuzzi === "always" ? true : room.jacuzzi === "none" ? false : withJacuzzi,
         people, is_overnight: isOvernight,
         base_price: breakdown.base, third_person_surcharge: breakdown.thirdPerson,
         dynamic_surcharge: breakdown.dynamicSurcharge, dynamic_reason: breakdown.dynamicReason,
         extras_total: breakdown.extrasTotal, total,
-        deposit_amount: deposit, deposit_paid: false, manual_override: false, created_by_role: "public",
+        deposit_amount: deposit, deposit_paid: false,
+        status: "pending", manual_override: false, created_by_role: "public",
+        internal_notes: discountPct > 0 ? "Reserva de prueba — descuento debug −99,9%" : null,
       }).select("id").single();
       if (rerr) throw rerr;
+      createdReservationId = reservation.id;
 
       const rows = Object.entries(extraQty).filter(([, q]) => q > 0).map(([extraId, qty]) => {
         const ex = extras?.find(e => e.id === extraId);
-        return { reservation_id: reservation.id, extra_id: extraId, qty, unit_price: Number(ex?.price ?? 0), is_gift: false };
+        const msg = ex && decorationNeedsMessage(ex) ? decoMessages[extraId] : undefined;
+        return {
+          reservation_id: reservation.id, extra_id: extraId, qty,
+          unit_price: Number(ex?.price ?? 0), is_gift: false,
+          bed_message: msg?.bed.trim() || null,
+          screen_message: msg?.screen.trim() || null,
+        };
       });
       for (const giftId of breakdown.giftedExtraIds) {
         if (!rows.some(r => r.extra_id === giftId))
-          rows.push({ reservation_id: reservation.id, extra_id: giftId, qty: 1, unit_price: 0, is_gift: true });
+          rows.push({ reservation_id: reservation.id, extra_id: giftId, qty: 1, unit_price: 0, is_gift: true, bed_message: null, screen_message: null });
       }
       if (rows.length > 0) await supabase.from("reservation_extras").insert(rows);
 
@@ -959,7 +1038,30 @@ function PublicReservePage() {
         "create-redsys-payment",
         { body: { reservation_id: reservation.id } },
       );
-      if (redsysErr) throw redsysErr;
+      if (redsysErr) {
+        let msg = "Error al procesar el pago";
+        try {
+          // FunctionsHttpError.context is the raw Response (body not yet consumed)
+          const ctx = (redsysErr as any).context;
+          if (ctx?.json) {
+            const body = await ctx.json();
+            msg = body?.error ?? body?.message ?? msg;
+          } else if ((redsysErr as any).message) {
+            msg = (redsysErr as any).message;
+          }
+        } catch { /* ignore */ }
+        console.error("[pago] error de edge function:", redsysErr);
+        throw new Error(msg);
+      }
+      // Bypass mode: edge function marked the reservation as paid directly
+      if (redsysData?.bypass) {
+        window.location.href = redsysData.redirectUrl ?? "/";
+        return;
+      }
+
+      if (!redsysData?.action || !redsysData?.formFields) {
+        throw new Error("Respuesta inesperada del servidor de pagos");
+      }
 
       // Auto-submit form to Redsys TPV (browser navigates away)
       const form = document.createElement("form");
@@ -976,13 +1078,42 @@ function PublicReservePage() {
       document.body.appendChild(form);
       form.submit();
       // Note: setPaying(false) intentionally omitted — browser navigates away
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al procesar el pago");
+    } catch (e: any) {
+      if (createdReservationId) {
+        await supabase.from("reservation_extras").delete().eq("reservation_id", createdReservationId);
+        await supabase.from("reservations").delete().eq("id", createdReservationId);
+      }
+      const msg = e?.message ?? e?.details ?? e?.hint ?? JSON.stringify(e) ?? "Error al procesar el pago";
+      console.error("[pago] excepción en createReservation:", e);
+      toast.error(msg);
       setPaying(false);
+      payingGuard.current = false;
     }
   };
 
   const currentStepIdx = STEP_INDEX[step] ?? 0;
+
+  // Total actually charged, after any discount code, and the 30% deposit taken
+  // online (floored at the Redsys minimum when a debug discount is active).
+  const payableTotal = useMemo(
+    () => (breakdown ? Math.round(breakdown.total * (1 - discountPct) * 100) / 100 : 0),
+    [breakdown, discountPct],
+  );
+  const depositAmount = useMemo(() => {
+    const d = Math.round(payableTotal * 0.3 * 100) / 100;
+    return discountPct > 0 ? Math.max(REDSYS_MIN_EUR, d) : d;
+  }, [payableTotal, discountPct]);
+
+  const applyDiscount = () => {
+    const code = discountInput.trim().toUpperCase();
+    if (code === DEBUG_DISCOUNT_CODE) {
+      setDiscountPct(DEBUG_DISCOUNT_PCT);
+      toast.success("Código aplicado (debug −99,9%)");
+    } else {
+      setDiscountPct(0);
+      toast.error("Código de descuento no válido");
+    }
+  };
 
   const extrasTotalSelected = useMemo(() => {
     return Object.entries(extraQty).reduce((s, [id, q]) => {
@@ -993,6 +1124,66 @@ function PublicReservePage() {
 
   const changeQty = (id: string, delta: number) =>
     setExtraQty(p => ({ ...p, [id]: Math.max(0, (p[id] ?? 0) + delta) }));
+
+  const setDecoMessage = (id: string, field: keyof DecoMessage, value: string) =>
+    setDecoMessages(p => {
+      const cur = p[id] ?? { bed: "", screen: "" };
+      return { ...p, [id]: { ...cur, [field]: value } };
+    });
+
+  // Decorations the customer has actually added that require phrases
+  const selectedDecoNeedingMessage = useMemo(
+    () => (extras ?? []).filter(e => decorationNeedsMessage(e) && (extraQty[e.id] ?? 0) > 0),
+    [extras, extraQty],
+  );
+
+  // Returns an error message if any required phrase is missing or too long
+  const validateDecoMessages = (): string | null => {
+    for (const ex of selectedDecoNeedingMessage) {
+      const m = decoMessages[ex.id] ?? { bed: "", screen: "" };
+      if (!m.bed.trim() || !m.screen.trim())
+        return `Escribe la frase de la cama y de la pantalla para «${ex.name}»`;
+      if (countWords(m.bed) > BED_MESSAGE_MAX_WORDS)
+        return `La frase en la cama de «${ex.name}» admite máximo ${BED_MESSAGE_MAX_WORDS} palabras`;
+      if (countWords(m.screen) > SCREEN_MESSAGE_MAX_WORDS)
+        return `La frase en la pantalla de «${ex.name}» admite máximo ${SCREEN_MESSAGE_MAX_WORDS} palabras`;
+    }
+    return null;
+  };
+
+  // Inputs shown under a decoration card once it has been added to the order
+  const renderDecoMessageInputs = (ex: ExtraLite) => {
+    if (!decorationNeedsMessage(ex) || (extraQty[ex.id] ?? 0) <= 0) return null;
+    const m = decoMessages[ex.id] ?? { bed: "", screen: "" };
+    const bedOver = countWords(m.bed) > BED_MESSAGE_MAX_WORDS;
+    const screenOver = countWords(m.screen) > SCREEN_MESSAGE_MAX_WORDS;
+    return (
+      <div className="rm-deco-msg" onClick={e => e.stopPropagation()}>
+        <div className="rm-deco-msg-field">
+          <label className="rm-deco-msg-label">Frase en la cama (máx. {BED_MESSAGE_MAX_WORDS} palabras) *</label>
+          <input
+            className={`rm-deco-msg-input${bedOver ? " rm-invalid" : ""}`}
+            value={m.bed}
+            maxLength={40}
+            placeholder="Ej. Te amo"
+            onChange={e => setDecoMessage(ex.id, "bed", e.target.value)}
+          />
+          {bedOver && <span className="rm-deco-msg-hint rm-over">Máximo {BED_MESSAGE_MAX_WORDS} palabras</span>}
+        </div>
+        <div className="rm-deco-msg-field">
+          <label className="rm-deco-msg-label">Frase en el cristal o pantalla LED (máx. {SCREEN_MESSAGE_MAX_WORDS} palabras) *</label>
+          <input
+            className={`rm-deco-msg-input${screenOver ? " rm-invalid" : ""}`}
+            value={m.screen}
+            maxLength={120}
+            placeholder="Ej. Feliz aniversario mi amor"
+            onChange={e => setDecoMessage(ex.id, "screen", e.target.value)}
+          />
+          {screenOver && <span className="rm-deco-msg-hint rm-over">Máximo {SCREEN_MESSAGE_MAX_WORDS} palabras</span>}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="rm-page">
@@ -1322,6 +1513,7 @@ function PublicReservePage() {
                                                     <button className="rm-qty-btn" onClick={e => { e.stopPropagation(); changeQty(ex.id, 1); }}>+</button>
                                                   </div>
                                                 </div>
+                                                {renderDecoMessageInputs(ex)}
                                               </div>
                                             </div>
                                           );
@@ -1429,6 +1621,7 @@ function PublicReservePage() {
                                       <button className="rm-qty-btn" onClick={() => changeQty(ex.id, 1)}>+</button>
                                     </div>
                                   </div>
+                                  {renderDecoMessageInputs(ex)}
                                 </div>
                               </div>
                             );
@@ -1440,7 +1633,14 @@ function PublicReservePage() {
                 </div>
               )}
 
-              <button className="rm-btn-continue" onClick={() => setStep("details")}>
+              <button
+                className="rm-btn-continue"
+                onClick={() => {
+                  const err = validateDecoMessages();
+                  if (err) return toast.error(err);
+                  setStep("details");
+                }}
+              >
                 Continuar con mis datos <ChevronRight size={16} />
               </button>
             </div>
@@ -1501,20 +1701,42 @@ function PublicReservePage() {
               <div className="rm-payment-box">
                 <div className="rm-payment-row">
                   <span>Total reserva</span>
-                  <span className="rm-payment-row-val">{eur(breakdown.total)}</span>
+                  <span className="rm-payment-row-val">{eur(payableTotal)}</span>
                 </div>
+                {discountPct > 0 && (
+                  <div className="rm-payment-row">
+                    <span>Descuento aplicado</span>
+                    <span className="rm-payment-row-val" style={{ color: "var(--gold-dark)" }}>
+                      −{(discountPct * 100).toLocaleString("es-ES")}% (antes {eur(breakdown.total)})
+                    </span>
+                  </div>
+                )}
                 <div className="rm-payment-row">
                   <span>A pagar en el hotel</span>
-                  <span className="rm-payment-row-val">{eur(breakdown.total * 0.7)}</span>
+                  <span className="rm-payment-row-val">{eur(Math.max(0, payableTotal - depositAmount))}</span>
                 </div>
                 <div className="rm-payment-highlight">
                   <span style={{ fontSize: 14 }}>Depósito ahora (30%)</span>
-                  <span className="rm-payment-amount rm-serif">{eur(breakdown.total * 0.3)}</span>
+                  <span className="rm-payment-amount rm-serif">{eur(depositAmount)}</span>
                 </div>
               </div>
 
+              {/* Discount code */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "flex-end" }}>
+                <div className="rm-field" style={{ flex: 1 }}>
+                  <label className="rm-label">Código de descuento</label>
+                  <Input
+                    value={discountInput}
+                    onChange={e => setDiscountInput(e.target.value)}
+                    placeholder="Introduce tu código"
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyDiscount(); } }}
+                  />
+                </div>
+                <Button type="button" variant="outline" onClick={applyDiscount}>Aplicar</Button>
+              </div>
+
               <button className="rm-btn-primary" style={{ display: "flex" }} onClick={createReservation} disabled={paying}>
-                {paying ? "Redirigiendo al TPV…" : `Pagar ${eur(breakdown.total * 0.3)} con tarjeta`}
+                {paying ? "Redirigiendo al TPV…" : `Pagar ${eur(depositAmount)} con tarjeta`}
               </button>
 
               <p style={{ fontSize: 11, color: "var(--ink-soft)", textAlign: "center", marginTop: 10 }}>
@@ -1540,7 +1762,8 @@ function PublicReservePage() {
                 className="rm-btn-primary"
                 style={{ maxWidth: 280, margin: "0 auto" }}
                 onClick={() => {
-                  setStep("search"); setRoom(null); setExtraQty({});
+                  setStep("search"); setRoom(null); setExtraQty({}); setDecoMessages({});
+                  setDiscountInput(""); setDiscountPct(0);
                   setReservationId(null); setAdult(false);
                   setCustomerName(""); setCustomerEmail(""); setCustomerPhone("");
                 }}
