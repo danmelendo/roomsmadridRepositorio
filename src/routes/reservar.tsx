@@ -43,7 +43,7 @@ const ROOM_IMAGES_MAP: Record<string, Record<string, string>> = {
   },
   america: {
     "Dubai": "/imagenes/America/Dubai/Dubainueva.jpeg",
-    "Grey": "/imagenes/America/Grey/grey-america-02.webp",
+    "Grey": "/imagenes/America/Grey/grey-america-03.jpg",
     "Maldivas": "/imagenes/America/Maldivas/maldivas-03--hoteles-para-parejas-baratos.webp",
     "New York": "/imagenes/America/New York/nueva-york-04--reservar-habitaciones-por-horas-en-madrid.webp",
     "Tu y yo": "/imagenes/America/Tu y yo/tu-y-yo-galeria-05--hoteles-para-parejas-en-madrid.webp",
@@ -94,8 +94,19 @@ function getRoomImage(r: { name: string; building: string }) {
   return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23ccc' width='400' height='300'/%3E%3Ctext x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23999'%3EHabitación%3C/text%3E%3C/svg%3E";
 }
 
+// Decoration images per tier, keyed by price (Especial 20 €, Plus 30 €,
+// Premium 50 €, Premium Deluxe 145 €). Premium (50 €) has no dedicated photo
+// yet, so it falls back to the generic decoration image.
+const DECORATION_IMAGES_BY_PRICE: Record<number, string> = {
+  20: "/imagenes/maldivasdecoespacial.JPG", // Especial
+  30: "/imagenes/dubaiteamo.PNG",           // Plus
+  145: "/imagenes/moetpremiumdeluxe.PNG",   // Premium Deluxe
+};
+
 function getExtraImage(ex: ExtraLite) {
-  if (ex.category === "decoration") return extraDecoration;
+  if (ex.category === "decoration") {
+    return DECORATION_IMAGES_BY_PRICE[Number(ex.price)] ?? extraDecoration;
+  }
   if (/cava|moet|champ|juve/i.test(ex.name)) return extraChampagne;
   return null;
 }
