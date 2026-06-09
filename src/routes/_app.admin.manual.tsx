@@ -39,7 +39,7 @@ function ManualReservationPage() {
             <li>Elegir cualquier hora de entrada (incluso fuera de 22:00–24:00).</li>
             <li>Definir hora de fin libre (puedes saltarte las duraciones estándar).</li>
             <li>Sobrescribir el total final con el precio que quieras.</li>
-            <li>Saltarse la separación obligatoria de 15 min entre reservas.</li>
+            <li>Saltarse la separación de limpieza entre reservas (override puntual).</li>
             <li>Forzar noche completa cualquier día de la semana.</li>
           </ul>
           <Button onClick={() => setOpen(true)}>

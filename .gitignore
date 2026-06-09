@@ -27,6 +27,11 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Tool / agent artifacts (not essential to the repo)
+.claude/
+.lovable/
+.playwright-mcp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

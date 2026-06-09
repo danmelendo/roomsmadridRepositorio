@@ -32,17 +32,25 @@ function Calendar({
   weekStartsOn,
   onDayClick,
   contactPhones,
+  restrictContactDays = false,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
   contactPhones?: { number: string; href?: string }[];
+  /**
+   * When true, Thursday/Friday/Saturday are vetoed: clicking them opens the
+   * "reserva por teléfono/WhatsApp" dialog and blocks selection. This is meant
+   * for the public booking flow only — staff flows (reception/admin) must be
+   * able to book any day, so they leave this off (the default).
+   */
+  restrictContactDays?: boolean;
 }) {
   const [showContactDialog, setShowContactDialog] = React.useState(false);
   const [activePhones, setActivePhones] = React.useState<{ number: string; href?: string }[]>([]);
 
   const defaultClassNames = getDefaultClassNames();
 
-  const isContactDay = (date: Date) => CONTACT_DAYS.includes(date.getDay());
+  const isContactDay = (date: Date) => restrictContactDays && CONTACT_DAYS.includes(date.getDay());
 
   const handleDayClick = (date: Date, modifiers: any, e: React.MouseEvent) => {
     if (isContactDay(date)) {
@@ -75,7 +83,7 @@ function Calendar({
       onDayClick={handleDayClick}
       onSelect={handleSelect}
       modifiers={{
-        contactRequired: (date) => CONTACT_DAYS.includes(date.getDay()),
+        contactRequired: (date) => restrictContactDays && CONTACT_DAYS.includes(date.getDay()),
       }}
       modifiersClassNames={{
         contactRequired: "opacity-70 cursor-pointer border border-dashed border-amber-400",

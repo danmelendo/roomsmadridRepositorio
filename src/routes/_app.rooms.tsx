@@ -11,7 +11,8 @@ import { useRooms } from "@/lib/data";
 import { useRoles } from "@/lib/roles";
 import { Navigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Bath, Droplet, Pencil, Check, X } from "lucide-react";
+import { Bath, Droplet, Pencil, Check, X, ChevronUp, ChevronDown } from "lucide-react";
+import type { Room } from "@/lib/data";
 
 export const Route = createFileRoute("/_app/rooms")({
   component: RoomsPage,
@@ -64,6 +65,17 @@ function RoomsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const swapOrder = useMutation({
+    mutationFn: async ({ a, b }: { a: Room; b: Room }) => {
+      const { error: e1 } = await supabase.from("rooms").update({ sort_order: b.sort_order }).eq("id", a.id);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from("rooms").update({ sort_order: a.sort_order }).eq("id", b.id);
+      if (e2) throw e2;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const startEdit = (id: string, currentName: string) => {
     setEditingId(id);
     setEditingName(currentName);
@@ -86,11 +98,13 @@ function RoomsPage() {
         <p className="text-sm text-muted-foreground">Estado y catálogo del hotel</p>
       </div>
 
-      {buildings.map((b) => (
+      {buildings.map((b) => {
+        const buildingRooms = rooms?.filter((r) => r.building === b) ?? [];
+        return (
         <div key={b} className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">RM {b}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {rooms?.filter((r) => r.building === b).map((r) => (
+            {buildingRooms.map((r, i) => (
               <Card key={r.id}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
@@ -121,6 +135,22 @@ function RoomsPage() {
                           {r.jacuzzi === "none" && <Droplet className="h-4 w-4 text-muted-foreground" />}
                           <Button
                             size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            disabled={i === 0 || swapOrder.isPending}
+                            title="Subir"
+                            onClick={() => swapOrder.mutate({ a: r, b: buildingRooms[i - 1] })}
+                          >
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            disabled={i === buildingRooms.length - 1 || swapOrder.isPending}
+                            title="Bajar"
+                            onClick={() => swapOrder.mutate({ a: r, b: buildingRooms[i + 1] })}
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-foreground"
                             onClick={() => startEdit(r.id, r.name)}
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -148,7 +178,8 @@ function RoomsPage() {
             ))}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -15,6 +15,22 @@ export type ReservationExtra = Tables["reservation_extras"]["Row"];
 export type DynamicRule = Tables["dynamic_rules"]["Row"];
 export type GiftThreshold = Tables["gift_thresholds"]["Row"];
 
+// Hotels (buildings). The stored `building` value is inconsistent in
+// case/accent, so we normalise to a key for filtering/grouping.
+export const HOTELS: { key: string; label: string }[] = [
+  { key: "bernabeu", label: "RM Bernabéu" },
+  { key: "ventas", label: "RM Ventas" },
+  { key: "america", label: "RM América" },
+];
+
+export function buildingKey(building: string | null | undefined): string {
+  const b = (building ?? "").toLowerCase();
+  if (b.includes("bernab")) return "bernabeu";
+  if (b.includes("venta")) return "ventas";
+  if (b.includes("ameri") || b.includes("amér")) return "america";
+  return b;
+}
+
 export const DURATIONS = [60, 90, 120, 150, 180, 240, 300, 360];
 export const DURATION_LABELS: Record<number, string> = {
   60: "1h",

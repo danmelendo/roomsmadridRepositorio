@@ -320,6 +320,7 @@ export type Database = {
       reservations: {
         Row: {
           base_price: number
+          cleaning_minutes: number
           created_at: string
           created_by: string | null
           created_by_role: string | null
@@ -347,6 +348,7 @@ export type Database = {
         }
         Insert: {
           base_price?: number
+          cleaning_minutes?: number
           created_at?: string
           created_by?: string | null
           created_by_role?: string | null
@@ -374,6 +376,7 @@ export type Database = {
         }
         Update: {
           base_price?: number
+          cleaning_minutes?: number
           created_at?: string
           created_by?: string | null
           created_by_role?: string | null

@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { eur, STATUS_LABELS, STATUS_COLORS } from "@/lib/data";
+import { eur, STATUS_LABELS, STATUS_COLORS, HOTELS, buildingKey } from "@/lib/data";
 import { NewReservationDialog } from "@/components/NewReservationDialog";
 import { ReservationExtrasInfo, type ReservationExtraItem } from "@/components/ReservationExtrasInfo";
 import { Plus, X } from "lucide-react";
@@ -20,8 +20,10 @@ export const Route = createFileRoute("/_app/reservations")({
 function ReservationsPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [buildingFilter, setBuildingFilter] = useState<string>("all");
 
   const { data: reservations } = useQuery({
     queryKey: ["reservations", "list"],
@@ -49,6 +51,7 @@ function ReservationsPage() {
 
   const filtered = reservations?.filter((r) => {
     if (statusFilter !== "all" && r.status !== statusFilter) return false;
+    if (buildingFilter !== "all" && buildingKey(r.rooms?.building) !== buildingFilter) return false;
     if (search) {
       const s = search.toLowerCase();
       return (
@@ -64,7 +67,7 @@ function ReservationsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold tracking-tight">Reservas</h1>
-        <Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nueva</Button>
+        <Button onClick={() => { setEditId(undefined); setOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Nueva</Button>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -74,6 +77,13 @@ function ReservationsPage() {
           <SelectContent>
             <SelectItem value="all">Todos los estados</SelectItem>
             {Object.entries(STATUS_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={buildingFilter} onValueChange={setBuildingFilter}>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los hoteles</SelectItem>
+            {HOTELS.map((h) => <SelectItem key={h.key} value={h.key}>{h.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -98,9 +108,13 @@ function ReservationsPage() {
                   const s = new Date(r.start_at);
                   const e = new Date(r.end_at);
                   const extraItems = (r as { reservation_extras?: ReservationExtraItem[] }).reservation_extras;
+                  const notes = (r as { internal_notes?: string | null }).internal_notes;
                   return (
                     <Fragment key={r.id}>
-                    <tr className="border-b last:border-0 hover:bg-muted/30">
+                    <tr
+                      className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                      onClick={() => { setEditId(r.id); setOpen(true); }}
+                    >
                       <td className="p-2">
                         <div>{s.toLocaleDateString("es-ES")}</div>
                         <div className="text-xs text-muted-foreground font-mono">
@@ -132,16 +146,16 @@ function ReservationsPage() {
                       <td className="p-2 text-right font-medium tabular-nums">{eur(Number(r.total))}</td>
                       <td className="p-2 text-right">
                         {r.status !== "cancelled" && r.status !== "completed" && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => cancel.mutate(r.id)} title="Cancelar">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); cancel.mutate(r.id); }} title="Cancelar">
                             <X className="h-4 w-4" />
                           </Button>
                         )}
                       </td>
                     </tr>
-                    {extraItems?.length ? (
+                    {extraItems?.length || notes?.trim() ? (
                       <tr className="border-b last:border-0 bg-muted/10">
                         <td colSpan={7} className="px-2 pb-2 pt-0">
-                          <ReservationExtrasInfo items={extraItems} />
+                          <ReservationExtrasInfo items={extraItems} notes={notes} />
                         </td>
                       </tr>
                     ) : null}
@@ -157,7 +171,11 @@ function ReservationsPage() {
         </CardContent>
       </Card>
 
-      <NewReservationDialog open={open} onOpenChange={setOpen} />
+      <NewReservationDialog
+        open={open}
+        onOpenChange={(o) => { setOpen(o); if (!o) setEditId(undefined); }}
+        editReservationId={editId}
+      />
     </div>
   );
 }

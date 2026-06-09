@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { eur, STATUS_LABELS, STATUS_COLORS, useRooms } from "@/lib/data";
 import { NewReservationDialog } from "@/components/NewReservationDialog";
 import { ReservationExtrasInfo, type ReservationExtraItem } from "@/components/ReservationExtrasInfo";
+import { ExtendCleaningButton } from "@/components/ExtendCleaningButton";
 import { Plus, LogIn, LogOut, Clock } from "lucide-react";
 import { toast } from "sonner";
 
@@ -120,8 +121,14 @@ function TodayPage() {
                         <LogOut className="h-3.5 w-3.5 mr-1" /> Check-out
                       </Button>
                     )}
+                    {r.status !== "cancelled" && r.status !== "no_show" && r.status !== "rejected" && (
+                      <ExtendCleaningButton reservationId={r.id} currentCleaning={r.cleaning_minutes ?? 15} />
+                    )}
                   </div>
-                  <ReservationExtrasInfo items={(r as { reservation_extras?: ReservationExtraItem[] }).reservation_extras} />
+                  <ReservationExtrasInfo
+                    items={(r as { reservation_extras?: ReservationExtraItem[] }).reservation_extras}
+                    notes={(r as { internal_notes?: string | null }).internal_notes}
+                  />
                 </div>
               );
             })}

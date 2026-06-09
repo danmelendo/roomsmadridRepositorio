@@ -9,21 +9,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Bath, Droplet, Users, CalendarIcon, Sparkles,
   ShieldCheck, CheckCircle2, CreditCard, Plus, Minus, Gift,
-  Phone, ChevronRight, Tv, Moon, Clock, Star, Flame, MapPin, Globe,
+  Phone, ChevronRight, Tv, Moon, Clock, Star, Flame, MapPin, Globe, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculatePrice, type PriceBreakdown } from "@/lib/pricing";
 import { DURATIONS, DURATION_LABELS, eur, isOvernightAllowed } from "@/lib/data";
 
-// Placeholder images for fallback
-import extraChampagne from "@/assets/extra-champagne.jpg";
-import extraDecoration from "@/assets/extra-decoration.jpg";
+import { DecorationCarousel } from "@/components/DecorationCarousel";
 
 // Map to dynamically resolve room images from /public/imagenes
 const ROOM_IMAGES_MAP: Record<string, Record<string, string>> = {
@@ -94,22 +93,14 @@ function getRoomImage(r: { name: string; building: string }) {
   return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23ccc' width='400' height='300'/%3E%3Ctext x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23999'%3EHabitación%3C/text%3E%3C/svg%3E";
 }
 
-// Decoration images per tier, keyed by price (Especial 20 €, Plus 30 €,
-// Premium 50 €, Premium Deluxe 145 €). Premium (50 €) has no dedicated photo
-// yet, so it falls back to the generic decoration image.
-const DECORATION_IMAGES_BY_PRICE: Record<number, string> = {
-  20: "/imagenes/maldivasdecoespacial.JPG", // Especial
-  30: "/imagenes/dubaiteamo.PNG",           // Plus
-  145: "/imagenes/moetpremiumdeluxe.PNG",   // Premium Deluxe
-};
-
-function getExtraImage(ex: ExtraLite) {
-  if (ex.category === "decoration") {
-    return DECORATION_IMAGES_BY_PRICE[Number(ex.price)] ?? extraDecoration;
-  }
-  if (/cava|moet|champ|juve/i.test(ex.name)) return extraChampagne;
-  return null;
-}
+// Real uploaded decoration photos shown in an auto-advancing carousel on every
+// decoration card. Add more files in /public/imagenes and list them here.
+// (No AI-generated placeholders — cava/Moët/Juvé bottle images were removed.)
+const DECORATION_PHOTOS: string[] = [
+  "/imagenes/maldivasdecoespacial.JPG",
+  "/imagenes/dubaiteamo.PNG",
+  "/imagenes/moetpremiumdeluxe.PNG",
+];
 
 const EXTRA_CATEGORY_LABELS: Record<string, string> = {
   decoration: "Decoración",
@@ -204,6 +195,15 @@ const CONTACTS: Record<string, { phones: { number: string; href: string }[]; ema
     email: "reservas@roomsmadrid.es",
     address: "Av. América, 15 · CP 28028 Madrid",
   },
+};
+
+// WhatsApp booking line per hotel (mobile numbers). Used for the alternative
+// "reservar por WhatsApp" flow — no card payment, no DB write: it just opens a
+// chat with the reservation details prefilled so reception confirms manually.
+const WHATSAPP_NUMBERS: Record<string, { display: string; intl: string }> = {
+  bernabeu: { display: "605 472 600", intl: "34605472600" },
+  ventas:   { display: "685 066 656", intl: "34685066656" },
+  america:  { display: "657 992 990", intl: "34657992990" },
 };
 
 // ─────────────────────────────────────────────
@@ -784,6 +784,8 @@ function PublicReservePage() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [adult, setAdult] = useState(false);
   const [noContact, setNoContact] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
 
   const [breakdown, setBreakdown] = useState<PriceBreakdown | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
@@ -866,19 +868,31 @@ function PublicReservePage() {
     enabled: !!startAt && !!endAt,
     queryFn: async () => {
       if (!startAt || !endAt) return new Set<string>();
-      const padStart = new Date(startAt.getTime() - 15 * 60_000);
-      const padEnd = new Date(endAt.getTime() + 15 * 60_000);
-      const sixtyMinutesAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+      // Wide fetch window; precise overlap (with each reservation's cleaning
+      // buffer) is computed below. Reservations need ≥ cleaning_minutes of
+      // cleaning after they end before the room is reservable again.
+      const WINDOW_MS = 12 * 60 * 60_000;
+      const NEW_CLEANING_MIN = 15; // public bookings use the default buffer
+      const sixtyMinutesAgo = Date.now() - 60 * 60_000;
       const { data, error } = await supabase
-        .from("reservations").select("room_id,status,deposit_paid,created_at")
-        .gte("end_at", padStart.toISOString())
-        .lte("start_at", padEnd.toISOString())
-        .or(`deposit_paid.eq.true,created_at.gte.${sixtyMinutesAgo}`);
+        .from("reservations").select("room_id,status,created_at,start_at,end_at,cleaning_minutes")
+        .gte("end_at", new Date(startAt.getTime() - WINDOW_MS).toISOString())
+        .lte("start_at", new Date(endAt.getTime() + WINDOW_MS).toISOString());
       if (error) throw error;
       const blocked = new Set<string>();
+      const nStart = startAt.getTime();
+      const nEnd = endAt.getTime() + NEW_CLEANING_MIN * 60_000;
       for (const r of data ?? []) {
-        if (r.status === "cancelled" || r.status === "no_show" || r.status === "rejected") continue;
-        blocked.add(r.room_id);
+        // Only confirmed/active reservations block; pending blocks only while
+        // recent (abandoned public payments free the slot). Cancelled / no_show
+        // / rejected never block.
+        const blocks =
+          r.status === "confirmed" || r.status === "in_progress" || r.status === "completed" ||
+          (r.status === "pending" && new Date(r.created_at).getTime() > sixtyMinutesAgo);
+        if (!blocks) continue;
+        const rStart = new Date(r.start_at).getTime();
+        const rEnd = new Date(r.end_at).getTime() + (r.cleaning_minutes ?? 15) * 60_000;
+        if (rStart < nEnd && nStart < rEnd) blocked.add(r.room_id);
       }
       return blocked;
     },
@@ -988,7 +1002,53 @@ function PublicReservePage() {
   const submitDetails = () => {
     if (!customerName.trim() || !customerEmail.trim()) return toast.error("Nombre y email obligatorios");
     if (!adult) return toast.error("Debes confirmar que eres mayor de 18 años");
+    if (!acceptedTerms) return toast.error("Debes aceptar las condiciones de reserva y políticas de cancelación");
     setStep("payment");
+  };
+
+  // Alternative booking path: open WhatsApp with the reservation details
+  // prefilled. No card payment (skips Redsys) and no DB write — reception
+  // confirms the booking manually from the chat.
+  const reserveViaWhatsApp = () => {
+    if (!room || !startAt) return;
+    const wa = WHATSAPP_NUMBERS[building];
+    if (!wa) { toast.error("No hay WhatsApp disponible para este hotel"); return; }
+
+    const hotelLabel = BUILDINGS.find(b => b.value === building)?.label ?? room.building;
+    const fechaLarga = startAt.toLocaleDateString("es-ES", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    });
+    const duracion = isOvernight ? "Noche completa (hasta 10:00)" : DURATION_LABELS[pricingDuration];
+
+    const extrasSeleccionados = Object.entries(extraQty)
+      .filter(([, q]) => q > 0)
+      .map(([id, q]) => {
+        const ex = extras?.find(e => e.id === id);
+        return ex ? `• ${ex.name} x${q}` : null;
+      })
+      .filter(Boolean);
+
+    const lines = [
+      "¡Hola! Quiero reservar por WhatsApp (sin pago con tarjeta):",
+      "",
+      `Hotel: ${hotelLabel}`,
+      `Habitación: ${room.name}`,
+      `Fecha: ${fechaLarga}`,
+      `Entrada: ${time}`,
+      `Duración: ${duracion}`,
+      `Personas: ${people}`,
+      ...(extrasSeleccionados.length ? ["", "Extras:", ...extrasSeleccionados] : []),
+      "",
+      `Total estimado: ${eur(payableTotal)}`,
+      "",
+      "Mis datos:",
+      `- Nombre: ${customerName || "(por indicar)"}`,
+      `- Teléfono: ${customerPhone || "(por indicar)"}`,
+      `- Email: ${customerEmail || "(por indicar)"}`,
+    ];
+
+    const url = `https://wa.me/${wa.intl}?text=${encodeURIComponent(lines.join("\n"))}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const createReservation = async () => {
@@ -1293,6 +1353,7 @@ function PublicReservePage() {
                         onSelect={d => setDate(d ? format(d, "yyyy-MM-dd") : "")}
                         disabled={d => d < new Date(new Date().toDateString())}
                         contactPhones={CONTACTS[building]?.phones}
+                        restrictContactDays
                         initialFocus
                       />
                     </PopoverContent>
@@ -1509,10 +1570,9 @@ function PublicReservePage() {
                                       <div className="rm-extras-grid">
                                         {items.map(ex => {
                                           const q = extraQty[ex.id] ?? 0;
-                                          const img = getExtraImage(ex);
                                           return (
                                             <div key={ex.id} className={`rm-extra-item${q > 0 ? " selected" : ""}`}>
-                                              {img && <img src={img} alt={ex.name} className="rm-extra-img" loading="lazy" />}
+                                              {ex.category === "decoration" && <DecorationCarousel images={DECORATION_PHOTOS} />}
                                               <div className="rm-extra-body">
                                                 <div className="rm-extra-name">{ex.name}</div>
                                                 {ex.description && <div className="rm-extra-desc">{ex.description}</div>}
@@ -1609,11 +1669,10 @@ function PublicReservePage() {
                         <div className="rm-extras-grid">
                           {items.map(ex => {
                             const q = extraQty[ex.id] ?? 0;
-                            const img = getExtraImage(ex);
                             const isGift = breakdown?.giftedExtraIds.includes(ex.id);
                             return (
                               <div key={ex.id} className={`rm-extra-item${q > 0 ? " selected" : ""}`}>
-                                {img && <img src={img} alt={ex.name} className="rm-extra-img" loading="lazy" />}
+                                {ex.category === "decoration" && <DecorationCarousel images={DECORATION_PHOTOS} />}
                                 <div className="rm-extra-body">
                                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 4, marginBottom: 2 }}>
                                     <div className="rm-extra-name">{ex.name}</div>
@@ -1684,8 +1743,27 @@ function PublicReservePage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <label className="rm-check-row">
                   <Checkbox checked={adult} onCheckedChange={v => setAdult(v === true)} />
-                  <span>Confirmo que soy <strong>mayor de 18 años</strong> y acepto las condiciones de reserva. *</span>
+                  <span>Confirmo que soy <strong>mayor de 18 años</strong>. *</span>
                 </label>
+                <div className="rm-check-row" style={{ cursor: "default" }}>
+                  <Checkbox checked={acceptedTerms} onCheckedChange={v => setAcceptedTerms(v === true)} />
+                  <span>
+                    Acepto las{" "}
+                    <button
+                      type="button"
+                      onClick={() => setTermsOpen(true)}
+                      style={{
+                        background: "none", border: "none", padding: 0,
+                        color: "var(--gold-dark)", fontWeight: 500,
+                        textDecoration: "underline", cursor: "pointer",
+                        font: "inherit",
+                      }}
+                    >
+                      condiciones de reserva y políticas de cancelación
+                    </button>
+                    . *
+                  </span>
+                </div>
                 <label className="rm-check-row">
                   <Checkbox checked={noContact} onCheckedChange={v => setNoContact(v === true)} />
                   <span>No quiero recibir comunicaciones comerciales.</span>
@@ -1697,6 +1775,50 @@ function PublicReservePage() {
               </button>
             </div>
             <SummaryBar room={room} startAt={startAt} endAt={endAt} people={people} isOvernight={isOvernight} duration={pricingDuration} breakdown={breakdown} />
+
+            <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+              <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+                <DialogHeader>
+                  <DialogTitle>Condiciones de reserva</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 text-sm leading-relaxed text-muted-foreground">
+                  <ul className="list-disc space-y-2 pl-5">
+                    <li>Los jacuzzis se encontrarán vacíos para comprobar que estén limpios.</li>
+                    <li>Sólo se gestionan reservas a mayores de 18 años. No aceptamos permiso de tutor/padre/madre. Se solicitará DNI a partir de 21:00 a 09:00 (durante el día se solicitará si es necesario comprobar la edad).</li>
+                    <li>Prohibida la entrada de bebidas, cachimbas y decoraciones de fuera.</li>
+                    <li>Nos reservamos el derecho de admisión.</li>
+                    <li>No se permiten faltas de respeto hacia otros clientes ni hacia el personal.</li>
+                    <li>El personal llamará por teléfono a la habitación cinco minutos antes de la hora de salida en reservas por horas y treinta minutos antes en reservas por noche completa.</li>
+                  </ul>
+
+                  <div>
+                    <p className="font-semibold text-foreground">En caso de retraso:</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5">
+                      <li>Pasados 5 minutos, se cobrará una penalización de 10€.</li>
+                      <li>Cada 5 minutos adicionales, se cobrará otro recargo de 10€, sucesivamente, hasta realizar la salida.</li>
+                    </ul>
+                  </div>
+
+                  <p>Las reservas serán anuladas pasados 15 minutos desde la hora de entrada si el cliente no avisa. En caso de llegar con retraso, la hora de salida no varía y se cobrará el tiempo reservado.</p>
+
+                  <div>
+                    <p className="font-semibold text-foreground">Opciones de cancelación:</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-5">
+                      <li>Cambio de fecha, según disponibilidad.</li>
+                      <li>Si cancela dentro de las 48h previas a la reserva, pierde la reserva y el pago anticipado.</li>
+                      <li>En ningún caso se devuelve el importe abonado.</li>
+                    </ul>
+                  </div>
+
+                  <p>Por daños ocasionados en las instalaciones, deberá cubrir dichos gastos.</p>
+
+                  <div>
+                    <p className="font-semibold text-foreground">Grupos de 3 personas:</p>
+                    <p className="mt-1">Será necesario dejar una fianza entre 50€ y 100€ en efectivo según valoración del establecimiento.</p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
@@ -1752,6 +1874,35 @@ function PublicReservePage() {
 
               <p style={{ fontSize: 11, color: "var(--ink-soft)", textAlign: "center", marginTop: 10 }}>
                 Pago seguro procesado por Redsys · Redirección al TPV de tu banco
+              </p>
+
+              {/* Alternative: book via WhatsApp (no card payment, no Redsys) */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 16px" }}>
+                <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-soft)" }}>o</span>
+                <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+              </div>
+
+              <button
+                type="button"
+                onClick={reserveViaWhatsApp}
+                disabled={paying}
+                style={{
+                  width: "100%", height: 52, borderRadius: 10, border: "none",
+                  background: "#25D366", color: "#fff", cursor: paying ? "not-allowed" : "pointer",
+                  fontSize: 14, fontWeight: 500, letterSpacing: "0.04em",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  fontFamily: "'DM Sans', sans-serif", opacity: paying ? 0.5 : 1,
+                  transition: "filter 0.2s",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.filter = "brightness(0.93)")}
+                onMouseLeave={e => (e.currentTarget.style.filter = "none")}
+              >
+                <MessageCircle size={18} /> Reservar por WhatsApp (sin pago online)
+              </button>
+
+              <p style={{ fontSize: 11, color: "var(--ink-soft)", textAlign: "center", marginTop: 10 }}>
+                Te abriremos un chat con los datos de tu reserva. Sin pago con tarjeta · Confirmación con recepción
               </p>
             </div>
             <SummaryBar room={room} startAt={startAt} endAt={endAt} people={people} isOvernight={isOvernight} duration={pricingDuration} breakdown={breakdown} />
