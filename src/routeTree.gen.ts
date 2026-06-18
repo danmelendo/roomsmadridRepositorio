@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ReservarChar123slugChar125RouteImport } from './routes/reservar-{$slug}'
 import { Route as ReservarOkRouteImport } from './routes/reservar-ok'
 import { Route as ReservarRouteImport } from './routes/reservar'
 import { Route as LoginRouteImport } from './routes/login'
@@ -19,11 +20,18 @@ import { Route as AppRoomsRouteImport } from './routes/_app.rooms'
 import { Route as AppReservationsRouteImport } from './routes/_app.reservations'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppRatesRouteImport } from './routes/_app.rates'
+import { Route as AppPromosRouteImport } from './routes/_app.promos'
 import { Route as AppExtrasRouteImport } from './routes/_app.extras'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCalendarRouteImport } from './routes/_app.calendar'
 import { Route as AppAdminManualRouteImport } from './routes/_app.admin.manual'
 
+const ReservarChar123slugChar125Route =
+  ReservarChar123slugChar125RouteImport.update({
+    id: '/reservar-{$slug}',
+    path: '/reservar-{$slug}',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ReservarOkRoute = ReservarOkRouteImport.update({
   id: '/reservar-ok',
   path: '/reservar-ok',
@@ -73,6 +81,11 @@ const AppRatesRoute = AppRatesRouteImport.update({
   path: '/rates',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPromosRoute = AppPromosRouteImport.update({
+  id: '/promos',
+  path: '/promos',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppExtrasRoute = AppExtrasRouteImport.update({
   id: '/extras',
   path: '/extras',
@@ -99,9 +112,11 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reservar': typeof ReservarRoute
   '/reservar-ok': typeof ReservarOkRoute
+  '/reservar-{$slug}': typeof ReservarChar123slugChar125Route
   '/calendar': typeof AppCalendarRoute
   '/customers': typeof AppCustomersRoute
   '/extras': typeof AppExtrasRoute
+  '/promos': typeof AppPromosRoute
   '/rates': typeof AppRatesRoute
   '/reports': typeof AppReportsRoute
   '/reservations': typeof AppReservationsRoute
@@ -114,9 +129,11 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reservar': typeof ReservarRoute
   '/reservar-ok': typeof ReservarOkRoute
+  '/reservar-{$slug}': typeof ReservarChar123slugChar125Route
   '/calendar': typeof AppCalendarRoute
   '/customers': typeof AppCustomersRoute
   '/extras': typeof AppExtrasRoute
+  '/promos': typeof AppPromosRoute
   '/rates': typeof AppRatesRoute
   '/reports': typeof AppReportsRoute
   '/reservations': typeof AppReservationsRoute
@@ -131,9 +148,11 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reservar': typeof ReservarRoute
   '/reservar-ok': typeof ReservarOkRoute
+  '/reservar-{$slug}': typeof ReservarChar123slugChar125Route
   '/_app/calendar': typeof AppCalendarRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/extras': typeof AppExtrasRoute
+  '/_app/promos': typeof AppPromosRoute
   '/_app/rates': typeof AppRatesRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/reservations': typeof AppReservationsRoute
@@ -148,9 +167,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/reservar'
     | '/reservar-ok'
+    | '/reservar-{$slug}'
     | '/calendar'
     | '/customers'
     | '/extras'
+    | '/promos'
     | '/rates'
     | '/reports'
     | '/reservations'
@@ -163,9 +184,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/reservar'
     | '/reservar-ok'
+    | '/reservar-{$slug}'
     | '/calendar'
     | '/customers'
     | '/extras'
+    | '/promos'
     | '/rates'
     | '/reports'
     | '/reservations'
@@ -179,9 +202,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/reservar'
     | '/reservar-ok'
+    | '/reservar-{$slug}'
     | '/_app/calendar'
     | '/_app/customers'
     | '/_app/extras'
+    | '/_app/promos'
     | '/_app/rates'
     | '/_app/reports'
     | '/_app/reservations'
@@ -196,10 +221,18 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ReservarRoute: typeof ReservarRoute
   ReservarOkRoute: typeof ReservarOkRoute
+  ReservarChar123slugChar125Route: typeof ReservarChar123slugChar125Route
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/reservar-{$slug}': {
+      id: '/reservar-{$slug}'
+      path: '/reservar-{$slug}'
+      fullPath: '/reservar-{$slug}'
+      preLoaderRoute: typeof ReservarChar123slugChar125RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reservar-ok': {
       id: '/reservar-ok'
       path: '/reservar-ok'
@@ -270,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRatesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/promos': {
+      id: '/_app/promos'
+      path: '/promos'
+      fullPath: '/promos'
+      preLoaderRoute: typeof AppPromosRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/extras': {
       id: '/_app/extras'
       path: '/extras'
@@ -305,6 +345,7 @@ interface AppRouteChildren {
   AppCalendarRoute: typeof AppCalendarRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppExtrasRoute: typeof AppExtrasRoute
+  AppPromosRoute: typeof AppPromosRoute
   AppRatesRoute: typeof AppRatesRoute
   AppReportsRoute: typeof AppReportsRoute
   AppReservationsRoute: typeof AppReservationsRoute
@@ -317,6 +358,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCalendarRoute: AppCalendarRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppExtrasRoute: AppExtrasRoute,
+  AppPromosRoute: AppPromosRoute,
   AppRatesRoute: AppRatesRoute,
   AppReportsRoute: AppReportsRoute,
   AppReservationsRoute: AppReservationsRoute,
@@ -333,6 +375,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ReservarRoute: ReservarRoute,
   ReservarOkRoute: ReservarOkRoute,
+  ReservarChar123slugChar125Route: ReservarChar123slugChar125Route,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
 
     const { data: reservation, error: findErr } = await supabase
       .from("reservations")
-      .select("id, deposit_paid")
+      .select("id, deposit_paid, promo_code_id")
       .eq("redsys_order", order)
       .maybeSingle();
 
@@ -164,6 +164,13 @@ Deno.serve(async (req) => {
         console.error("redsys-notification: failed to mark deposit_paid for order", order, markErr);
         // Return non-200 so Redsys retries
         return new Response("DB Error", { status: 500 });
+      }
+
+      // Count the promo redemption now the booking is actually paid (single-use
+      // codes are deactivated/archived by the RPC).
+      if (reservation.promo_code_id) {
+        const { error: redeemErr } = await supabase.rpc("redeem_promo_code", { p_id: reservation.promo_code_id });
+        if (redeemErr) console.warn("redsys-notification: failed to redeem promo code", redeemErr);
       }
 
       // Trigger confirmation email

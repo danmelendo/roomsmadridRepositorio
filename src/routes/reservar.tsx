@@ -19,33 +19,55 @@ import {
   Phone, ChevronRight, Tv, Moon, Clock, Star, Flame, MapPin, Globe, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { calculatePrice, type PriceBreakdown } from "@/lib/pricing";
+import { calculatePrice, round2, type PriceBreakdown } from "@/lib/pricing";
 import { DURATIONS, DURATION_LABELS, eur, isOvernightAllowed } from "@/lib/data";
+import { discountEurosForRoom, type DiscountType } from "@/lib/promos";
+import { roomForSlug } from "@/lib/roomSlugs";
 
 import { DecorationCarousel } from "@/components/DecorationCarousel";
+import { RoomImageCarousel } from "@/components/RoomImageCarousel";
 
-// Map to dynamically resolve room images from /public/imagenes
-const ROOM_IMAGES_MAP: Record<string, Record<string, string>> = {
+// Map to dynamically resolve room images from /public/imagenes. Each room can
+// list several photos that are shown in a manual carousel (no autoscroll). Only
+// photos whose name matches the room are listed here.
+const ROOM_IMAGES_MAP: Record<string, Record<string, string[]>> = {
   bernabeu: {
-    "Grey": "/imagenes/Bernabeu/Grey/greybernabeu.jpeg",
-    "Ocean": "/imagenes/Bernabeu/Ocean/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-ocean-1.webp",
-    "Paris": "/imagenes/Bernabeu/Paris/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-paris-4.webp",
-    "Safari": "/imagenes/Bernabeu/Safari/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-safari-4.webp",
-    "Tokyo": "/imagenes/Bernabeu/Tokio/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-tokio-1.webp",
+    "Grey": ["/imagenes/Bernabeu/Grey/greybernabeu.jpeg"],
+    "Ocean": ["/imagenes/Bernabeu/Ocean/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-ocean-1.webp"],
+    "Paris": ["/imagenes/Bernabeu/Paris/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-paris-4.webp"],
+    "Safari": ["/imagenes/Bernabeu/Safari/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-safari-4.webp"],
+    "Tokyo": ["/imagenes/Bernabeu/Tokio/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-tokio-1.webp"],
   },
   ventas: {
-    "Empire State": "/imagenes/Ventas/Empire State/habitacion-romantica-hotel-madrid-ventas-empire-state-2.webp",
-    "Grey": "/imagenes/Ventas/Grey/habitacion-romantica-hotel-madrid-ventas-grey-1-ver.webp",
-    "Hollywood": "/imagenes/Ventas/Hollywood/habitacion-romantica-hotel-madrid-ventas-hollywood.webp",
-    "Music": "/imagenes/Ventas/Music/habitacion-romantica-hotel-madrid-ventas-music-2.webp",
-    "Route 66": "/imagenes/Ventas/Route 66/ruta66nueva.jpeg",
+    "Empire State": [
+      "/imagenes/Ventas/Empire State/habitacion-romantica-hotel-madrid-ventas-empire-state-2.webp",
+      "/imagenes/Ventas/Empire State/Empire_1.jpeg",
+      "/imagenes/Ventas/Empire State/Empire_2.jpeg",
+      "/imagenes/Ventas/Empire State/Empire_jacuzzi.jpeg",
+    ],
+    "Grey": ["/imagenes/Ventas/Grey/habitacion-romantica-hotel-madrid-ventas-grey-1-ver.webp"],
+    "Hollywood": [
+      "/imagenes/Ventas/Hollywood/habitacion-romantica-hotel-madrid-ventas-hollywood.webp",
+      "/imagenes/Ventas/Hollywood/Hollywood_1.jpeg",
+      "/imagenes/Ventas/Hollywood/Hollywood_2.jpeg",
+      "/imagenes/Ventas/Hollywood/Hollywood_3.jpeg",
+      "/imagenes/Ventas/Hollywood/Hollywood_4.jpeg",
+    ],
+    "Music": ["/imagenes/Ventas/Music/habitacion-romantica-hotel-madrid-ventas-music-2.webp"],
+    "Route 66": [
+      "/imagenes/Ventas/Route 66/ruta66nueva.jpeg",
+      "/imagenes/Ventas/Route 66/ruta66.jpeg",
+      "/imagenes/Ventas/Route 66/ruta66_2.jpeg",
+      "/imagenes/Ventas/Route 66/JacuzziRuta66.jpeg",
+      "/imagenes/Ventas/Route 66/Ruta66_tantra.jpeg",
+    ],
   },
   america: {
-    "Dubai": "/imagenes/America/Dubai/Dubainueva.jpeg",
-    "Grey": "/imagenes/America/Grey/grey-america-03.jpg",
-    "Maldivas": "/imagenes/America/Maldivas/maldivas-03--hoteles-para-parejas-baratos.webp",
-    "New York": "/imagenes/America/New York/nueva-york-04--reservar-habitaciones-por-horas-en-madrid.webp",
-    "Tu y yo": "/imagenes/America/Tu y yo/tu-y-yo-galeria-05--hoteles-para-parejas-en-madrid.webp",
+    "Dubai": ["/imagenes/America/Dubai/Dubainueva.jpeg"],
+    "Grey": ["/imagenes/America/Grey/grey-america-03.jpg"],
+    "Maldivas": ["/imagenes/America/Maldivas/maldivas-03--hoteles-para-parejas-baratos.webp"],
+    "New York": ["/imagenes/America/New York/nueva-york-04--reservar-habitaciones-por-horas-en-madrid.webp"],
+    "Tu y yo": ["/imagenes/America/Tu y yo/tu-y-yo-galeria-05--hoteles-para-parejas-en-madrid.webp"],
   },
 };
 
@@ -70,6 +92,7 @@ interface RoomLite {
   has_tv: boolean;
   has_swing: boolean;
   rate_group_id: string | null;
+  allows_overnight: boolean;
 }
 
 interface ExtraLite {
@@ -80,17 +103,22 @@ interface ExtraLite {
   category: string;
 }
 
-function getRoomImage(r: { name: string; building: string }) {
+const ROOM_IMAGE_FALLBACK =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23ccc' width='400' height='300'/%3E%3Ctext x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23999'%3EHabitación%3C/text%3E%3C/svg%3E";
+
+// Returns all photos for a room (for the carousel). Falls back to a generic
+// placeholder when no photos are registered for the room.
+function getRoomImages(r: { name: string; building: string }): string[] {
   const building = r.building.toLowerCase();
-  const roomName = r.name;
-  
   const buildingMap = ROOM_IMAGES_MAP[building as keyof typeof ROOM_IMAGES_MAP];
-  if (buildingMap && buildingMap[roomName]) {
-    return buildingMap[roomName];
-  }
-  
-  // Fallback: return a generic placeholder (e.g., a data URL or default image)
-  return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23ccc' width='400' height='300'/%3E%3Ctext x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23999'%3EHabitación%3C/text%3E%3C/svg%3E";
+  const imgs = buildingMap?.[r.name];
+  if (imgs && imgs.length) return imgs;
+  return [ROOM_IMAGE_FALLBACK];
+}
+
+// Returns the primary (first) photo for a room — used for thumbnails/summaries.
+function getRoomImage(r: { name: string; building: string }) {
+  return getRoomImages(r)[0];
 }
 
 // Real uploaded decoration photos shown in an auto-advancing carousel on every
@@ -100,6 +128,8 @@ const DECORATION_PHOTOS: string[] = [
   "/imagenes/maldivasdecoespacial.JPG",
   "/imagenes/dubaiteamo.PNG",
   "/imagenes/moetpremiumdeluxe.PNG",
+  "/imagenes/Decos/Premium/DecoPremium.jpeg",
+  "/imagenes/Decos/Premium/decopremium_2.jpeg",
 ];
 
 const EXTRA_CATEGORY_LABELS: Record<string, string> = {
@@ -135,6 +165,17 @@ function countWords(s: string) {
 interface DecoMessage {
   bed: string;
   screen: string;
+}
+
+// A discount code the customer has successfully applied. `id` is null for the
+// debug code (which has no DB row); `debug` discounts the whole total instead of
+// just the room price.
+interface AppliedPromo {
+  id: string | null;
+  code: string;
+  type: DiscountType;
+  value: number;
+  debug?: boolean;
 }
 
 const STEPS = [
@@ -754,7 +795,13 @@ const CSS = `
 // ─────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────
-function PublicReservePage() {
+export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}) {
+  // When reached via a shareable per-room URL (/reservar-<slug>), preselect that
+  // room's building and feature the room at the top of the list.
+  const initialEntry = useMemo(() => roomForSlug(initialSlug), [initialSlug]);
+  const appliedSlugRef = useRef(false);
+  const [featuredName, setFeaturedName] = useState<string | null>(initialEntry?.name ?? null);
+
   const [step, setStep] = useState<Step>("search");
 
   // search
@@ -763,7 +810,7 @@ function PublicReservePage() {
   const [duration, setDuration] = useState(120);
   const [isOvernight, setIsOvernight] = useState(false);
   const [people, setPeople] = useState(2);
-  const [building, setBuilding] = useState("bernabeu");
+  const [building, setBuilding] = useState<string>(initialEntry?.building ?? "bernabeu");
 
   // room
   const [room, setRoom] = useState<RoomLite | null>(null);
@@ -774,9 +821,11 @@ function PublicReservePage() {
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
   // Personalised phrases per decoration extra id (bed + glass/LED screen)
   const [decoMessages, setDecoMessages] = useState<Record<string, DecoMessage>>({});
-  // Discount code (debug): see DEBUG_DISCOUNT_CODE
+  // Discount code: the debug code (DEBUG_DISCOUNT_CODE) or a real promo code
+  // validated server-side. A promo only ever discounts the room price, never the
+  // extras. `debug` marks the −99,9% test code which discounts the whole total.
   const [discountInput, setDiscountInput] = useState("");
-  const [discountPct, setDiscountPct] = useState(0);
+  const [promo, setPromo] = useState<AppliedPromo | null>(null);
 
   // customer
   const [customerName, setCustomerName] = useState("");
@@ -797,7 +846,16 @@ function PublicReservePage() {
   const payingGuard = useRef(false);
 
   const startAt = useMemo(() => (date && time ? new Date(`${date}T${time}:00`) : null), [date, time]);
-  const overnightAllowed = startAt ? isOvernightAllowed(startAt) : false;
+  // Overnight requires both an eligible entry day and a room that allows it.
+  const roomAllowsOvernight = room?.allows_overnight !== false;
+  const dayAllowsOvernight = startAt ? isOvernightAllowed(startAt) : false;
+  const overnightAllowed = dayAllowsOvernight && roomAllowsOvernight;
+
+  // Never keep an overnight selection on a room/day that doesn't allow it
+  // (e.g. after switching to an hourly-only room).
+  useEffect(() => {
+    if (isOvernight && !overnightAllowed) setIsOvernight(false);
+  }, [isOvernight, overnightAllowed]);
 
   const endAt = useMemo(() => {
     if (!startAt) return null;
@@ -816,7 +874,7 @@ function PublicReservePage() {
     queryKey: ["public-rooms"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("rooms").select("id,name,building,capacity,jacuzzi,has_tv,has_swing,rate_group_id")
+        .from("rooms").select("id,name,building,capacity,jacuzzi,has_tv,has_swing,rate_group_id,allows_overnight")
         .eq("active", true).order("sort_order");
       if (error) throw error;
       return data as RoomLite[];
@@ -933,7 +991,7 @@ function PublicReservePage() {
   const availableRooms = useMemo(() => {
     if (!rooms) return [];
 
-    return rooms.filter((r) => {
+    const filtered = rooms.filter((r) => {
       const roomBuilding = String(r.building ?? "")
         .trim()
         .toLowerCase();
@@ -944,7 +1002,29 @@ function PublicReservePage() {
 
       return roomBuilding.includes(selectedBuilding);
     });
-  }, [rooms, people, building]);
+
+    // A featured room (reached via /reservar-<slug>) is shown first.
+    if (featuredName) {
+      filtered.sort((a, b) => {
+        const af = a.name === featuredName ? 0 : 1;
+        const bf = b.name === featuredName ? 0 : 1;
+        return af - bf;
+      });
+    }
+    return filtered;
+  }, [rooms, building, featuredName]);
+
+  // Land directly on the room when arriving via a per-room URL: preselect the
+  // building and default the date so its card is shown, then scroll to it.
+  useEffect(() => {
+    if (appliedSlugRef.current) return;
+    if (!initialEntry || !rooms) return;
+    appliedSlugRef.current = true;
+    setBuilding(initialEntry.building);
+    setFeaturedName(initialEntry.name);
+    setDate((prev) => prev || format(new Date(), "yyyy-MM-dd"));
+    setDidSearch(true);
+  }, [initialEntry, rooms]);
 
   useEffect(() => {
     if (didSearch && availableRooms.length > 0) {
@@ -1053,6 +1133,13 @@ function PublicReservePage() {
 
   const createReservation = async () => {
     if (!room || !startAt || !endAt || !breakdown) return;
+    // Safety net: never let an overnight stay through with a 0 € base price
+    // (would happen if a room is flagged overnight-capable but its rate group
+    // has no overnight rate configured).
+    if (isOvernight && breakdown.base <= 0) {
+      toast.error("Esta habitación no tiene tarifa de noche completa configurada.");
+      return;
+    }
     if (payingGuard.current) return;
     payingGuard.current = true;
     setPaying(true);
@@ -1083,7 +1170,13 @@ function PublicReservePage() {
         extras_total: breakdown.extrasTotal, total,
         deposit_amount: deposit, deposit_paid: false,
         status: "pending", manual_override: false, created_by_role: "public",
-        internal_notes: discountPct > 0 ? "Reserva de prueba — descuento debug −99,9%" : null,
+        promo_code_id: promo?.debug ? null : promo?.id ?? null,
+        discount_amount: discountAmount,
+        internal_notes: promo?.debug
+          ? "Reserva de prueba — descuento debug −99,9%"
+          : promo
+            ? `Código ${promo.code} aplicado (−${eur(discountAmount)} sobre habitación)`
+            : null,
       }).select("id").single();
       if (rerr) throw rerr;
       createdReservationId = reservation.id;
@@ -1164,26 +1257,53 @@ function PublicReservePage() {
 
   const currentStepIdx = STEP_INDEX[step] ?? 0;
 
+  // Room subtotal a promo code can discount — extras are always excluded.
+  const roomSubtotal = useMemo(
+    () => (breakdown ? round2(breakdown.base + breakdown.thirdPerson + breakdown.dynamicSurcharge) : 0),
+    [breakdown],
+  );
+
+  // Euros knocked off by the applied code. The debug code discounts the whole
+  // total (to test the TPV with a ~0,01 € deposit); real promos only the room.
+  const discountAmount = useMemo(() => {
+    if (!breakdown || !promo) return 0;
+    if (promo.debug) return round2(breakdown.total * DEBUG_DISCOUNT_PCT);
+    return discountEurosForRoom({ discount_type: promo.type, discount_value: promo.value }, roomSubtotal);
+  }, [breakdown, promo, roomSubtotal]);
+
   // Total actually charged, after any discount code, and the 30% deposit taken
   // online (floored at the Redsys minimum when a debug discount is active).
   const payableTotal = useMemo(
-    () => (breakdown ? Math.round(breakdown.total * (1 - discountPct) * 100) / 100 : 0),
-    [breakdown, discountPct],
+    () => (breakdown ? round2(Math.max(0, breakdown.total - discountAmount)) : 0),
+    [breakdown, discountAmount],
   );
   const depositAmount = useMemo(() => {
-    const d = Math.round(payableTotal * 0.3 * 100) / 100;
-    return discountPct > 0 ? Math.max(REDSYS_MIN_EUR, d) : d;
-  }, [payableTotal, discountPct]);
+    const d = round2(payableTotal * 0.3);
+    return promo?.debug ? Math.max(REDSYS_MIN_EUR, d) : d;
+  }, [payableTotal, promo]);
 
-  const applyDiscount = () => {
+  const applyDiscount = async () => {
     const code = discountInput.trim().toUpperCase();
+    if (!code) return;
     if (code === DEBUG_DISCOUNT_CODE) {
-      setDiscountPct(DEBUG_DISCOUNT_PCT);
+      setPromo({ id: null, code, type: "percent", value: DEBUG_DISCOUNT_PCT * 100, debug: true });
       toast.success("Código aplicado (debug −99,9%)");
-    } else {
-      setDiscountPct(0);
-      toast.error("Código de descuento no válido");
+      return;
     }
+    const { data, error } = await supabase.rpc("validate_promo_code", { p_code: code });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row) {
+      setPromo(null);
+      toast.error("Código no válido o caducado");
+      return;
+    }
+    setPromo({
+      id: row.id,
+      code: row.code,
+      type: row.discount_type as DiscountType,
+      value: Number(row.discount_value),
+    });
+    toast.success("Código aplicado");
   };
 
   const extrasTotalSelected = useMemo(() => {
@@ -1414,7 +1534,11 @@ function PublicReservePage() {
                       Noche completa
                     </div>
                     <div className="rm-overnight-row-sub">
-                      {overnightAllowed ? "Disponible dom–mié · 22:00 – 10:00" : "Solo dom–mié · 22:00 – 10:00"}
+                      {!roomAllowsOvernight
+                        ? "Esta habitación solo se reserva por horas"
+                        : overnightAllowed
+                          ? "Disponible dom–mié · 22:00 – 10:00"
+                          : "Solo dom–mié · 22:00 – 10:00"}
                     </div>
                   </div>
                   <Switch
@@ -1475,31 +1599,46 @@ function PublicReservePage() {
                   {availableRooms.map(r => {
                     const fromPrice = fromPriceByRoom.get(r.id);
                     const unavailable = conflicts?.has(r.id);
+                    // Rooms flagged hourly-only are greyed out while the overnight
+                    // option is active (they can only be booked by the hour).
+                    const overnightBlocked = isOvernight && r.allows_overnight === false;
+                    const blocked = unavailable || overnightBlocked;
                     const isExpanded = expandedExtrasRoom === r.id;
                     const roomExtras = extras?.filter(e => e.category !== "services") ?? [];
                     const selectedInRoom = roomExtras.filter(e => (extraQty[e.id] ?? 0) > 0);
 
                     return (
-                      <div key={r.id} className={`rm-room-card${unavailable ? " rm-unavailable" : ""}`} style={{ position: "relative" }}>
-                        {unavailable && (
+                      <div key={r.id} className={`rm-room-card${blocked ? " rm-unavailable" : ""}`} style={{ position: "relative", ...(featuredName && r.name === featuredName && !blocked ? { boxShadow: "0 0 0 2px var(--gold)" } : {}) }}>
+                        {blocked && (
                           <div className="rm-unavailable-overlay">
                             <div className="rm-unavailable-pill" style={{ flexDirection: "column", alignItems: "center", gap: 6, padding: "12px 20px", textAlign: "center" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                                <span style={{ fontSize: 16 }}>🔒</span>
-                                No disponible para este horario
-                              </div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, opacity: 0.85 }}>
-                                {CONTACTS[building]?.phones.map((p, i) => (
-                                  <a key={i} href={p.href} style={{ color: "var(--gold-light)", textDecoration: "none", fontWeight: 500 }}>
-                                    {p.number}
-                                  </a>
-                                ))}
-                              </div>
+                              {unavailable ? (
+                                <>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                                    <span style={{ fontSize: 16 }}>🔒</span>
+                                    No disponible para este horario
+                                  </div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, opacity: 0.85 }}>
+                                    {CONTACTS[building]?.phones.map((p, i) => (
+                                      <a key={i} href={p.href} style={{ color: "var(--gold-light)", textDecoration: "none", fontWeight: 500 }}>
+                                        {p.number}
+                                      </a>
+                                    ))}
+                                  </div>
+                                </>
+                              ) : (
+                                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                                  <span style={{ fontSize: 16 }}>🕑</span>
+                                  Esta habitación solo puede reservarse por horas
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
                         <div className="rm-room-top">
-                          <img src={getRoomImage(r)} alt={r.name} className="rm-room-img" loading="lazy" />
+                          <div className="rm-room-img" style={{ padding: 0 }}>
+                            <RoomImageCarousel images={getRoomImages(r)} alt={r.name} height="100%" className="rm-room-img" />
+                          </div>
                           <div className="rm-room-info">
                             <div className="rm-room-building">RM {r.building}</div>
                             <div className="rm-room-name rm-serif">{r.name}</div>
@@ -1529,11 +1668,11 @@ function PublicReservePage() {
                             </div>
                             <button
                               className="rm-btn-select"
-                              onClick={() => !unavailable && selectRoom(r)}
-                              disabled={!!unavailable}
-                              style={unavailable ? { opacity: 0.35, cursor: "not-allowed" } : {}}
+                              onClick={() => !blocked && selectRoom(r)}
+                              disabled={!!blocked}
+                              style={blocked ? { opacity: 0.35, cursor: "not-allowed" } : {}}
                             >
-                              {unavailable ? "No disponible" : "Elegir esta"}
+                              {unavailable ? "No disponible" : overnightBlocked ? "Solo por horas" : "Elegir esta"}
                             </button>
                           </div>
                         </div>
@@ -1638,7 +1777,7 @@ function PublicReservePage() {
             <div>
               {/* Room hero */}
               <div className="rm-card" style={{ padding: 0, overflow: "hidden", marginBottom: 20 }}>
-                <img src={getRoomImage(room)} alt={room.name} style={{ width: "100%", height: 260, objectFit: "cover", display: "block" }} />
+                <RoomImageCarousel images={getRoomImages(room)} alt={room.name} height={260} />
                 <div style={{ padding: "24px 28px" }}>
                   <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 6 }}>RM {room.building}</div>
                   <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 30, fontWeight: 500, color: "var(--ink)", marginBottom: 12 }}>{room.name}</div>
@@ -1836,11 +1975,11 @@ function PublicReservePage() {
                   <span>Total reserva</span>
                   <span className="rm-payment-row-val">{eur(payableTotal)}</span>
                 </div>
-                {discountPct > 0 && (
+                {promo && discountAmount > 0 && (
                   <div className="rm-payment-row">
-                    <span>Descuento aplicado</span>
+                    <span>Descuento {promo.code}{!promo.debug && " (habitación)"}</span>
                     <span className="rm-payment-row-val" style={{ color: "var(--gold-dark)" }}>
-                      −{(discountPct * 100).toLocaleString("es-ES")}% (antes {eur(breakdown.total)})
+                      −{eur(discountAmount)} (antes {eur(breakdown.total)})
                     </span>
                   </div>
                 )}
@@ -1925,7 +2064,7 @@ function PublicReservePage() {
                 style={{ maxWidth: 280, margin: "0 auto" }}
                 onClick={() => {
                   setStep("search"); setRoom(null); setExtraQty({}); setDecoMessages({});
-                  setDiscountInput(""); setDiscountPct(0);
+                  setDiscountInput(""); setPromo(null);
                   setReservationId(null); setAdult(false);
                   setCustomerName(""); setCustomerEmail(""); setCustomerPhone("");
                 }}

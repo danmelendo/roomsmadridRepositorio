@@ -337,6 +337,8 @@ export type Database = {
           manual_override: boolean
           paid_amount: number
           people: number
+          promo_code_id: string | null
+          discount_amount: number
           room_id: string
           start_at: string
           status: Database["public"]["Enums"]["reservation_status"]
@@ -365,6 +367,8 @@ export type Database = {
           manual_override?: boolean
           paid_amount?: number
           people?: number
+          promo_code_id?: string | null
+          discount_amount?: number
           room_id: string
           start_at: string
           status?: Database["public"]["Enums"]["reservation_status"]
@@ -393,6 +397,8 @@ export type Database = {
           manual_override?: boolean
           paid_amount?: number
           people?: number
+          promo_code_id?: string | null
+          discount_amount?: number
           room_id?: string
           start_at?: string
           status?: Database["public"]["Enums"]["reservation_status"]
@@ -417,11 +423,64 @@ export type Database = {
             referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reservations_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      promo_codes: {
+        Row: {
+          active: boolean
+          archived: boolean
+          code: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          id: string
+          max_uses: number | null
+          single_use: boolean
+          times_used: number
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          active?: boolean
+          archived?: boolean
+          code: string
+          created_at?: string
+          discount_type: string
+          discount_value: number
+          id?: string
+          max_uses?: number | null
+          single_use?: boolean
+          times_used?: number
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Update: {
+          active?: boolean
+          archived?: boolean
+          code?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          max_uses?: number | null
+          single_use?: boolean
+          times_used?: number
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: []
       }
       rooms: {
         Row: {
           active: boolean
+          allows_overnight: boolean
           building: string
           capacity: number
           created_at: string
@@ -438,6 +497,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          allows_overnight?: boolean
           building: string
           capacity?: number
           created_at?: string
@@ -454,6 +514,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          allows_overnight?: boolean
           building?: string
           capacity?: number
           created_at?: string
@@ -510,6 +571,23 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      archive_expired_promo_codes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      validate_promo_code: {
+        Args: { p_code: string }
+        Returns: {
+          id: string
+          code: string
+          discount_type: string
+          discount_value: number
+        }[]
+      }
+      redeem_promo_code: {
+        Args: { p_id: string }
+        Returns: undefined
       }
     }
     Enums: {

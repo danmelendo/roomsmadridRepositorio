@@ -1,17 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useRooms } from "@/lib/data";
 import { useRoles } from "@/lib/roles";
 import { Navigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Bath, Droplet, Pencil, Check, X, ChevronUp, ChevronDown } from "lucide-react";
+import { Bath, Droplet, Pencil, Check, X, ChevronUp, ChevronDown, Info, Moon } from "lucide-react";
 import type { Room } from "@/lib/data";
 
 export const Route = createFileRoute("/_app/rooms")({
@@ -38,8 +39,21 @@ function RoomsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
 
-  if (rolesLoading) return null;
-  if (!isAdmin) return <Navigate to="/today" />;
+  // Habitaciones con una reserva en curso (check-in realizado) se muestran como
+  // ocupadas, independientemente de su estado manual.
+  const { data: inProgressRoomIds } = useQuery({
+    queryKey: ["rooms", "in_progress_room_ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reservations")
+        .select("room_id")
+        .eq("status", "in_progress");
+      if (error) throw error;
+      return new Set((data ?? []).map((r) => r.room_id));
+    },
+    refetchInterval: 30_000,
+  });
+  const occupiedRoomIds = inProgressRoomIds ?? new Set<string>();
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -61,6 +75,19 @@ function RoomsPage() {
       qc.invalidateQueries({ queryKey: ["rooms"] });
       toast.success("Nombre actualizado");
       setEditingId(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateOvernight = useMutation({
+    mutationFn: async ({ id, allows }: { id: string; allows: boolean }) => {
+      const { error } = await supabase.from("rooms").update({ allows_overnight: allows }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rooms"] });
+      qc.invalidateQueries({ queryKey: ["public-rooms"] });
+      toast.success("Noche completa actualizada");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -89,6 +116,9 @@ function RoomsPage() {
 
   const cancelEdit = () => setEditingId(null);
 
+  if (rolesLoading) return null;
+  if (!isAdmin) return <Navigate to="/today" />;
+
   const buildings = Array.from(new Set(rooms?.map((r) => r.building) ?? []));
 
   return (
@@ -104,7 +134,10 @@ function RoomsPage() {
         <div key={b} className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">RM {b}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {buildingRooms.map((r, i) => (
+            {buildingRooms.map((r, i) => {
+              const autoOccupied = occupiedRoomIds.has(r.id);
+              const displayStatus = autoOccupied ? "occupied" : r.status;
+              return (
               <Card key={r.id}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
@@ -166,16 +199,35 @@ function RoomsPage() {
                     <span>·</span>
                     <span>{r.jacuzzi === "none" ? "Sin jacuzzi" : "Con jacuzzi"}</span>
                   </div>
-                  <Badge variant="outline" className={STATUS_STYLES[r.status]}>{STATUS_LABELS[r.status]}</Badge>
+                  <Badge variant="outline" className={STATUS_STYLES[displayStatus]}>{STATUS_LABELS[displayStatus]}</Badge>
+                  {autoOccupied && (
+                    <p className="flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-300">
+                      <Info className="h-3.5 w-3.5 shrink-0" />
+                      Reserva en curso (check-in realizado)
+                    </p>
+                  )}
                   <Select value={r.status} onValueChange={(v) => updateStatus.mutate({ id: r.id, status: v })}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {Object.entries(STATUS_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-2.5 py-2">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <Moon className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="font-medium">Noche completa</span>
+                    </div>
+                    <Switch
+                      checked={r.allows_overnight}
+                      disabled={updateOvernight.isPending}
+                      onCheckedChange={(v) => updateOvernight.mutate({ id: r.id, allows: v })}
+                      aria-label="Permitir noche completa"
+                    />
+                  </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </div>
         );

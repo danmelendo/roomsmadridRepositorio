@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
 
     const { data: reservation, error: dbErr } = await supabase
       .from("reservations")
-      .select("id, deposit_amount, deposit_paid")
+      .select("id, deposit_amount, deposit_paid, promo_code_id")
       .eq("id", reservation_id)
       .single();
 
@@ -175,6 +175,10 @@ Deno.serve(async (req) => {
         status: "confirmed",
         redsys_order: `BYPASS-${reservation_id.slice(0, 8)}`,
       }).eq("id", reservation_id);
+      if (reservation.promo_code_id) {
+        const { error: redeemErr } = await supabase.rpc("redeem_promo_code", { p_id: reservation.promo_code_id });
+        if (redeemErr) console.warn("create-redsys-payment: bypass promo redeem failed", redeemErr);
+      }
       try {
         await supabase.functions.invoke("send-reservation-confirmation", {
           body: { reservation_id },

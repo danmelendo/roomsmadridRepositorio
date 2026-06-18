@@ -100,6 +100,14 @@ export function NewReservationDialog({ open, onOpenChange, defaultStart, default
   const [overrideTotal, setOverrideTotal] = useState<string>("");
   const [overrideEnd, setOverrideEnd] = useState<string>(""); // datetime-local for admin
   const [loadedCustomerId, setLoadedCustomerId] = useState<string | null>(null); // edit mode
+  const [loadedManualOverride, setLoadedManualOverride] = useState(false); // edit mode
+
+  // The override controls (manual total / end time) are available to admins and,
+  // crucially, when editing a reservation that was already saved as a manual
+  // override — even from the standard reservations/calendar dialogs (mode !==
+  // "admin"). Without this, editing such a reservation would silently drop the
+  // manual price back to the auto-calculated one.
+  const canOverride = isAdmin || loadedManualOverride;
 
   useEffect(() => {
     if (!open) return;
@@ -124,6 +132,7 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
     setOverrideTotal("");
     setOverrideEnd("");
     setLoadedCustomerId(null);
+    setLoadedManualOverride(false);
   }, [open, defaultStart, defaultRoomId, editReservationId]);
 
   // Edit mode: load the existing reservation + its extras and prefill the form.
@@ -162,6 +171,12 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
       }
       setExtraQty(qty);
       setExtraPrice(price);
+      // Re-seed the admin price override so editing preserves the manual total
+      // instead of silently reverting to the auto-calculated price.
+      setLoadedManualOverride(!!r.manual_override);
+      if (r.manual_override) {
+        setOverrideTotal(Number(r.total).toFixed(2).replace(".", ","));
+      }
     })();
     return () => { cancel = true; };
   }, [open, editReservationId]);
@@ -192,10 +207,16 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
 
   const room = useMemo(() => rooms?.find((r) => r.id === roomId), [rooms, roomId]);
   const rateGroupId = room?.rate_group_id ?? null;
+  // Rooms can be flagged as hourly-only by an admin; overnight is then blocked
+  // for everyone (including staff who can otherwise force it on any day).
+  const roomAllowsOvernight = room?.allows_overnight !== false;
   useEffect(() => {
     if (room?.jacuzzi === "none") setWithJacuzzi(false);
     if (room?.jacuzzi === "always") setWithJacuzzi(true);
   }, [room]);
+  useEffect(() => {
+    if (!roomAllowsOvernight && isOvernight) setIsOvernight(false);
+  }, [roomAllowsOvernight, isOvernight]);
 
   const selectedExtras = useMemo(() => {
     if (!extras) return [];
@@ -294,7 +315,7 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
       }
 
       let endAt: Date;
-      if (isAdmin && overrideEnd) {
+      if (canOverride && overrideEnd) {
         endAt = new Date(overrideEnd);
         if (Number.isNaN(endAt.getTime()) || endAt <= startAt) throw new Error("Hora de salida inválida");
       } else {
@@ -308,7 +329,7 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
       }
 
       const overrideNum = Number.parseFloat(overrideTotal.replace(",", "."));
-      const useOverride = isAdmin && Number.isFinite(overrideNum);
+      const useOverride = canOverride && Number.isFinite(overrideNum);
       const finalTotal = useOverride ? overrideNum : (breakdown?.total ?? 0);
 
       const reservationFields = {
@@ -400,11 +421,20 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
     setExtraQty((q) => ({ ...q, [id]: Math.max(0, (q[id] ?? 0) + delta) }));
   };
 
+  // Total shown to the admin: the manual override (if a valid number is set)
+  // takes precedence over the auto-calculated breakdown total.
+  const displayTotal = useMemo(() => {
+    const overrideNum = Number.parseFloat(overrideTotal.replace(",", "."));
+    if (canOverride && Number.isFinite(overrideNum)) return overrideNum;
+    return breakdown?.total ?? null;
+  }, [canOverride, overrideTotal, breakdown]);
+
   const setExtraManualPrice = (id: string, value: string) => {
     setExtraPrice((p) => ({ ...p, [id]: value }));
   };
 
   const setOvernightChecked = (checked: boolean) => {
+    if (checked && !roomAllowsOvernight) return;
     setIsOvernight(checked);
     if (checked) {
       setTime("22:00");
@@ -419,13 +449,13 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
             <DialogTitle>{isEdit ? "Editar reserva" : isAdmin ? "Reserva manual (admin)" : isPublic ? "Reserva tu habitación" : "Nueva reserva"}</DialogTitle>
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Total</div>
-              <div className="text-lg font-semibold tabular-nums">{breakdown ? eur(breakdown.total) : "—"}</div>
+              <div className="text-lg font-semibold tabular-nums">{displayTotal !== null ? eur(displayTotal) : "—"}</div>
             </div>
           </div>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
-          {isAdmin && (
+          {canOverride && (
             <div className="mb-4 space-y-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
               <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">Override admin</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -494,10 +524,14 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
                 <div>
                   <div className="text-sm font-medium">Noche completa</div>
                   <div className="text-xs text-muted-foreground">
-                    {overnightAllowed ? "Disponible (dom-mié) · 22:00–10:00" : "Solo dom-mié · 22:00–10:00"}
+                    {!roomAllowsOvernight
+                      ? "Esta habitación solo se reserva por horas"
+                      : overnightAllowed
+                        ? "Disponible (dom-mié) · 22:00–10:00"
+                        : "Solo dom-mié · 22:00–10:00"}
                   </div>
                 </div>
-                <Switch checked={isOvernight} onCheckedChange={setOvernightChecked} disabled={isPublic && !overnightAllowed} />
+                <Switch checked={isOvernight} onCheckedChange={setOvernightChecked} disabled={!roomAllowsOvernight || (isPublic && !overnightAllowed)} />
               </div>
 
               {isOvernight ? (
@@ -595,7 +629,10 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
                 )}
                 <div className="flex justify-between"><span className="text-muted-foreground">Extras</span><span className="tabular-nums">{eur(breakdown?.extrasTotal)}</span></div>
                 <Separator />
-                <div className="flex justify-between text-base font-semibold"><span>Total</span><span className="tabular-nums">{eur(breakdown?.total)}</span></div>
+                <div className="flex justify-between text-base font-semibold">
+                  <span>Total{canOverride && displayTotal !== (breakdown?.total ?? null) ? " (manual)" : ""}</span>
+                  <span className="tabular-nums">{displayTotal !== null ? eur(displayTotal) : eur(breakdown?.total)}</span>
+                </div>
               </div>
 
               <Separator />

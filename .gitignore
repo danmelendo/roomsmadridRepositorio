@@ -1,5 +1,4 @@
 # Environment variables — NEVER commit secrets
-.gitignore
 .env
 .env.*
 !.env.example
@@ -42,3 +41,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+docs/contexto-roomsmadrid.md
+docs/contexto-claude-app.md
