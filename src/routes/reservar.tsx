@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculatePrice, round2, type PriceBreakdown } from "@/lib/pricing";
-import { DURATIONS, DURATION_LABELS, eur, isOvernightAllowed } from "@/lib/data";
+import { DURATIONS, DURATION_LABELS, eur, isOvernightAllowed, buildingKey } from "@/lib/data";
 import { discountEurosForRoom, type DiscountType } from "@/lib/promos";
 import { roomForSlug } from "@/lib/roomSlugs";
 
@@ -93,6 +93,7 @@ interface RoomLite {
   has_swing: boolean;
   rate_group_id: string | null;
   allows_overnight: boolean;
+  status: string;
 }
 
 interface ExtraLite {
@@ -251,36 +252,47 @@ const WHATSAPP_NUMBERS: Record<string, { display: string; intl: string }> = {
 // Styles (injected once via <style> tag)
 // ─────────────────────────────────────────────
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Playfair:ital,wght@0,400..900;1,400..900&display=swap');
 
   .rm-page {
-    --gold: #b8975a;
-    --gold-light: #d4b483;
-    --gold-dark: #8a6e3e;
-    --ink: #1a1410;
-    --ink-mid: #3d3328;
-    --ink-soft: #7a6e62;
-    --cream: #faf7f2;
-    --cream-dark: #f0ead8;
+    /* Brand palette — Rooms Madrid insignia red over near-black & cream */
+    --blood: #731423;
+    --blood-light: #8b1027;
+    --blood-dark: #5c0f1c;
+    /* Former gold accents remapped to the insignia red. --gold-light is a
+       readable tint used over near-black backgrounds. */
+    --gold: #731423;
+    --gold-light: #cf7a89;
+    --gold-dark: #5c0f1c;
+    --ink: #0b0c0c;
+    --ink-mid: #3a3530;
+    --ink-soft: #7a7066;
+    --cream: #f6f3ec;
+    --cream-dark: #ece4d3;
     --warm-white: #fffdf9;
-    --border: rgba(184,151,90,0.25);
-    --border-strong: rgba(184,151,90,0.5);
-    font-family: 'DM Sans', sans-serif;
+    --border: rgba(115,20,35,0.18);
+    --border-strong: rgba(115,20,35,0.42);
+    font-family: 'Noto Sans', sans-serif;
     background: var(--cream);
     color: var(--ink);
     min-height: 100svh;
+    /* Defensive guard against horizontal overflow on small screens. overflow-x
+       clip (not hidden/auto) does NOT create a scroll container, so the sticky
+       header/summary keep working while any accidental overshoot is trimmed. */
+    overflow-x: clip;
   }
+  .rm-page img { max-width: 100%; }
 
   .rm-page * { box-sizing: border-box; }
   .rm-page *:where(:not(input):not(button):not(select):not(textarea)) { margin: 0; padding: 0; }
 
-  .rm-serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+  .rm-serif { font-family: 'Playfair', Georgia, serif; }
 
   /* Header */
   .rm-header {
     position: sticky; top: 0; z-index: 50;
     background: var(--ink);
-    border-bottom: 1px solid var(--gold-dark);
+    border-bottom: 2px solid var(--blood);
   }
   .rm-header-inner {
     max-width: 1100px; margin: 0 auto;
@@ -288,8 +300,12 @@ const CSS = `
     height: 64px;
     display: flex; align-items: center; gap: 20px;
   }
+  .rm-logo-img {
+    height: 30px; width: auto; display: block; flex-shrink: 0;
+  }
+  @media (max-width: 600px) { .rm-logo-img { height: 24px; } }
   .rm-logo {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 22px; font-weight: 600; letter-spacing: 0.08em;
     color: var(--gold);
     text-transform: uppercase;
@@ -305,11 +321,11 @@ const CSS = `
 
   /* Age banner */
   .rm-age-banner {
-    background: var(--gold);
+    background: var(--blood);
     text-align: center;
     padding: 7px 16px;
-    font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
-    color: var(--ink);
+    font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
+    color: #fff;
     display: flex; align-items: center; justify-content: center; gap: 6px;
   }
 
@@ -344,6 +360,26 @@ const CSS = `
   .rm-step.done .rm-step-num { background: var(--ink-mid); border-color: var(--ink-mid); color: #fff; }
   .rm-step-sep { flex: 1; height: 1px; background: var(--border); min-width: 12px; max-width: 60px; }
 
+  /* ── Mobile overflow fixes ──
+     On phones the header row (logo + back + website pill + phone) and the step
+     bar can be wider than the viewport, pushing the whole page sideways (the
+     blank area when scrolling right). Tighten spacing, drop the phone helper,
+     and let the step bar scroll within itself instead of the page. */
+  @media (max-width: 600px) {
+    .rm-header-inner { gap: 10px; padding: 0 14px; }
+    .rm-help { display: none; }
+    .rm-steps-inner {
+      padding: 0 14px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .rm-steps-inner::-webkit-scrollbar { display: none; }
+    .rm-step { font-size: 12px; }
+    .rm-step-num { width: 22px; height: 22px; }
+    .rm-step-sep { min-width: 8px; }
+    .rm-main { padding: 28px 16px 64px; }
+  }
+
   /* Main layout */
   .rm-main {
     max-width: 1100px; margin: 0 auto;
@@ -354,17 +390,17 @@ const CSS = `
   .rm-hero { text-align: center; margin-bottom: 48px; }
   .rm-hero-eyebrow {
     font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--gold); font-weight: 500; margin-bottom: 12px;
+    color: var(--blood); font-weight: 600; margin-bottom: 12px;
     display: flex; align-items: center; justify-content: center; gap: 8px;
   }
   .rm-hero h1 {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: clamp(38px, 7vw, 68px);
     font-weight: 500; line-height: 1.08;
     color: var(--ink);
     margin-bottom: 16px;
   }
-  .rm-hero h1 em { font-style: italic; color: var(--gold-dark); }
+  .rm-hero h1 em { font-style: italic; color: var(--blood); }
   .rm-hero p { font-size: 16px; color: var(--ink-soft); max-width: 480px; margin: 0 auto; line-height: 1.65; }
 
   .rm-search-card {
@@ -406,18 +442,18 @@ const CSS = `
 
   .rm-btn-primary {
     grid-column: 1 / -1;
-    background: var(--ink);
-    color: var(--gold-light);
+    background: linear-gradient(180deg, var(--blood-light) 0%, var(--blood) 100%);
+    color: #fff;
     border: none;
     border-radius: 10px;
     height: 52px;
-    font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
     display: flex; align-items: center; justify-content: center; gap: 8px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Noto Sans', sans-serif;
   }
-  .rm-btn-primary:hover { background: var(--gold-dark); color: #fff; }
+  .rm-btn-primary:hover { background: var(--blood-dark); color: #fff; box-shadow: 0 6px 22px rgba(115,20,35,0.28); }
 
   .rm-trust {
     display: grid; grid-template-columns: repeat(3, 1fr);
@@ -438,7 +474,7 @@ const CSS = `
   /* ── ROOMS STEP ── */
   .rm-section-header { margin-bottom: 28px; }
   .rm-section-header h2 {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 36px; font-weight: 500; color: var(--ink);
     margin-bottom: 6px;
   }
@@ -478,7 +514,7 @@ const CSS = `
     color: var(--gold); font-weight: 500; margin-bottom: 6px;
   }
   .rm-room-name {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 26px; font-weight: 500; color: var(--ink);
     margin-bottom: 12px; line-height: 1.1;
   }
@@ -507,23 +543,23 @@ const CSS = `
   }
   .rm-price-from { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
   .rm-price-amount {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 34px; font-weight: 500; color: var(--ink);
     line-height: 1;
   }
   .rm-btn-select {
-    background: var(--gold);
-    color: var(--ink);
+    background: linear-gradient(180deg, var(--blood-light) 0%, var(--blood) 100%);
+    color: #fff;
     border: none; border-radius: 8px;
     padding: 12px 24px;
-    font-size: 13px; font-weight: 500; letter-spacing: 0.05em;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.05em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background 0.2s;
-    font-family: 'DM Sans', sans-serif;
+    transition: background 0.2s, box-shadow 0.2s;
+    font-family: 'Noto Sans', sans-serif;
     white-space: nowrap;
   }
-  .rm-btn-select:hover { background: var(--gold-dark); color: #fff; }
+  .rm-btn-select:hover { background: var(--blood-dark); color: #fff; box-shadow: 0 6px 18px rgba(115,20,35,0.26); }
 
   /* Extras dentro de la habitación */
   .rm-room-extras {
@@ -538,7 +574,7 @@ const CSS = `
     padding: 16px 0;
     display: flex; align-items: center; justify-content: space-between;
     cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Noto Sans', sans-serif;
     color: var(--ink-mid); font-size: 13px; font-weight: 500;
   }
   .rm-extras-toggle:hover { color: var(--gold-dark); }
@@ -558,13 +594,13 @@ const CSS = `
     cursor: pointer;
     background: var(--warm-white);
   }
-  .rm-extra-item.selected { border-color: var(--gold); background: rgba(184,151,90,0.04); }
+  .rm-extra-item.selected { border-color: var(--gold); background: rgba(115,20,35,0.05); }
   .rm-extra-img { width: 100%; height: 90px; object-fit: cover; display: block; }
   .rm-extra-body { padding: 10px 12px; }
   .rm-extra-name { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 2px; line-height: 1.3; }
   .rm-extra-desc { font-size: 11px; color: var(--ink-soft); line-height: 1.4; margin-bottom: 8px; }
   .rm-extra-footer { display: flex; align-items: center; justify-content: space-between; }
-  .rm-extra-price { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 500; color: var(--gold-dark); }
+  .rm-extra-price { font-family: 'Playfair', serif; font-size: 18px; font-weight: 500; color: var(--gold-dark); }
   .rm-extra-qty { display: flex; align-items: center; gap: 6px; }
   .rm-qty-btn {
     width: 26px; height: 26px; border-radius: 50%;
@@ -572,7 +608,7 @@ const CSS = `
     background: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     color: var(--ink-mid); transition: background 0.15s;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Noto Sans', sans-serif;
     font-size: 14px; line-height: 1;
   }
   .rm-qty-btn:hover { background: var(--gold); border-color: var(--gold); color: #fff; }
@@ -597,7 +633,7 @@ const CSS = `
     padding: 32px;
   }
   .rm-card h2 {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 28px; font-weight: 500; color: var(--ink);
     margin-bottom: 24px;
   }
@@ -626,7 +662,7 @@ const CSS = `
     color: var(--gold-light); font-weight: 500;
   }
   .rm-summary-name {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 22px; color: #fff; margin: 4px 0 16px;
   }
   .rm-summary-row {
@@ -642,7 +678,7 @@ const CSS = `
     padding: 6px 0;
   }
   .rm-summary-total-val {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 26px; color: var(--gold-light);
   }
   .rm-summary-deposit {
@@ -664,11 +700,11 @@ const CSS = `
     font-weight: 500;
   }
   .rm-payment-amount {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 32px; color: var(--gold-dark);
   }
   .rm-demo-notice {
-    background: rgba(184,151,90,0.08); border: 1px solid var(--border);
+    background: rgba(115,20,35,0.06); border: 1px solid var(--border);
     border-radius: 8px; padding: 12px 14px;
     font-size: 12px; color: var(--gold-dark); margin-bottom: 20px;
   }
@@ -679,13 +715,13 @@ const CSS = `
   }
   .rm-done-icon {
     width: 72px; height: 72px; border-radius: 50%;
-    background: rgba(184,151,90,0.12); border: 1px solid var(--border);
+    background: rgba(115,20,35,0.10); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto 24px;
     color: var(--gold);
   }
   .rm-done h2 {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair', serif;
     font-size: 42px; font-weight: 500; color: var(--ink); margin-bottom: 14px;
   }
   .rm-done p { font-size: 15px; color: var(--ink-soft); line-height: 1.65; margin-bottom: 8px; }
@@ -697,7 +733,7 @@ const CSS = `
     color: rgba(255,255,255,0.7); border-radius: 7px;
     padding: 6px 14px; font-size: 12px; cursor: pointer;
     margin-left: auto;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Noto Sans', sans-serif;
     transition: border-color 0.15s, color 0.15s;
   }
   .rm-back:hover { border-color: var(--gold-light); color: var(--gold-light); }
@@ -705,16 +741,16 @@ const CSS = `
   /* Continue btn in layout */
   .rm-btn-continue {
     width: 100%;
-    background: var(--ink); color: var(--gold-light);
+    background: linear-gradient(180deg, var(--blood-light) 0%, var(--blood) 100%); color: #fff;
     border: none; border-radius: 10px;
     height: 52px;
-    font-size: 13px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
-    cursor: pointer; transition: background 0.2s;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer; transition: background 0.2s, box-shadow 0.2s;
     display: flex; align-items: center; justify-content: center; gap: 8px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Noto Sans', sans-serif;
     margin-top: 20px;
   }
-  .rm-btn-continue:hover { background: var(--gold-dark); color: #fff; }
+  .rm-btn-continue:hover { background: var(--blood-dark); color: #fff; box-shadow: 0 6px 22px rgba(115,20,35,0.28); }
   .rm-btn-continue:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Building select */
@@ -724,9 +760,9 @@ const CSS = `
     border: 1px solid var(--border-strong);
     border-radius: 10px; padding: 10px 14px;
     cursor: pointer; width: 100%;
-    font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--ink);
+    font-family: 'Noto Sans', sans-serif; font-size: 14px; color: var(--ink);
     appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a6e3e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23731423' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 12px center;
     padding-right: 32px;
     transition: border-color 0.15s;
@@ -757,12 +793,47 @@ const CSS = `
 
   /* Footer */
   .rm-footer {
-    background: var(--ink); color: rgba(255,255,255,0.4);
-    text-align: center; padding: 20px 24px;
-    font-size: 12px; line-height: 1.7;
-    border-top: 1px solid rgba(184,151,90,0.2);
+    background: var(--ink); color: rgba(255,255,255,0.55);
+    border-top: 2px solid var(--blood);
   }
-  .rm-footer strong { color: var(--gold-light); }
+  .rm-footer-inner {
+    max-width: 1100px; margin: 0 auto;
+    padding: 48px 24px 32px;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 40px;
+  }
+  @media (max-width: 760px) {
+    .rm-footer-inner { grid-template-columns: 1fr; gap: 32px; text-align: center; }
+  }
+  .rm-footer-logo { height: 40px; width: auto; margin-bottom: 18px; }
+  @media (max-width: 760px) { .rm-footer-logo { margin-inline: auto; } }
+  .rm-footer-about { font-size: 13px; line-height: 1.7; color: rgba(255,255,255,0.55); max-width: 320px; }
+  @media (max-width: 760px) { .rm-footer-about { margin-inline: auto; } }
+  .rm-footer-col h4 {
+    font-family: 'Playfair', serif;
+    font-size: 17px; font-weight: 600; letter-spacing: 0.04em;
+    color: var(--gold-light); margin-bottom: 14px;
+  }
+  .rm-footer-col p { font-size: 13px; line-height: 1.6; margin-bottom: 8px; color: rgba(255,255,255,0.6); }
+  .rm-footer-col a { color: rgba(255,255,255,0.78); text-decoration: none; transition: color 0.15s; }
+  .rm-footer-col a:hover { color: var(--gold-light); }
+  .rm-footer-social { display: flex; gap: 10px; margin-bottom: 24px; }
+  @media (max-width: 760px) { .rm-footer-social { justify-content: center; } }
+  .rm-footer-social a {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.16);
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .rm-footer-social a:hover { border-color: var(--gold); background: rgba(115,20,35,0.18); }
+  .rm-footer-social img { width: 16px; height: 16px; object-fit: contain; }
+  .rm-footer-bottom {
+    border-top: 1px solid rgba(255,255,255,0.08);
+    text-align: center; padding: 18px 24px;
+    font-size: 12px; line-height: 1.7; color: rgba(255,255,255,0.4);
+  }
+  .rm-footer-bottom strong { color: var(--gold-light); }
 
   /* Decoration message inputs */
   .rm-deco-msg {
@@ -782,7 +853,7 @@ const CSS = `
     border-radius: 8px;
     padding: 8px 10px;
     font-size: 13px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Noto Sans', sans-serif;
     color: var(--ink);
     background: var(--warm-white);
   }
@@ -857,6 +928,12 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     if (isOvernight && !overnightAllowed) setIsOvernight(false);
   }, [isOvernight, overnightAllowed]);
 
+  // Noche completa solo admite 2 personas: si venía de una búsqueda por horas
+  // con 3/4, lo reseteamos a 2 al activar la noche completa.
+  useEffect(() => {
+    if (isOvernight && people !== 2) setPeople(2);
+  }, [isOvernight, people]);
+
   const endAt = useMemo(() => {
     if (!startAt) return null;
     const e = new Date(startAt);
@@ -874,7 +951,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     queryKey: ["public-rooms"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("rooms").select("id,name,building,capacity,jacuzzi,has_tv,has_swing,rate_group_id,allows_overnight")
+        .from("rooms").select("id,name,building,capacity,jacuzzi,has_tv,has_swing,rate_group_id,allows_overnight,status")
         .eq("active", true).order("sort_order");
       if (error) throw error;
       return data as RoomLite[];
@@ -991,17 +1068,11 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
   const availableRooms = useMemo(() => {
     if (!rooms) return [];
 
-    const filtered = rooms.filter((r) => {
-      const roomBuilding = String(r.building ?? "")
-        .trim()
-        .toLowerCase();
-
-      const selectedBuilding = String(building ?? "")
-        .trim()
-        .toLowerCase();
-
-      return roomBuilding.includes(selectedBuilding);
-    });
+    const filtered = rooms.filter(
+      // Normalise both sides through buildingKey so accented DB values
+      // ("Bernabéu", "América") still match the selected building key.
+      (r) => buildingKey(r.building) === buildingKey(building),
+    );
 
     // A featured room (reached via /reservar-<slug>) is shown first.
     if (featuredName) {
@@ -1032,13 +1103,6 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       setDidSearch(false);
     }
   }, [didSearch, availableRooms.length]);
-
-  useEffect(() => {
-    if (rooms) {
-      const uniqueBuildings = [...new Set(rooms.map(r => r.building))];
-      console.log("UNIQUE BUILDINGS:", uniqueBuildings);
-    }
-  }, [rooms]);
 
   const selectRoom = (r: RoomLite) => {
     setRoom(r);
@@ -1145,6 +1209,18 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     setPaying(true);
     let createdReservationId: string | null = null;
     try {
+      // Re-check the room is still bookable: its manual status (out_of_service /
+      // cleaning / occupied) may have changed since the page loaded. The DB
+      // trigger enforces this too, but this gives the customer a clear message.
+      const { data: freshRoom } = await supabase
+        .from("rooms").select("status").eq("id", room.id).maybeSingle();
+      if (freshRoom && freshRoom.status !== "available") {
+        toast.error("Esta habitación ya no está disponible. Por favor, elige otra.");
+        setPaying(false);
+        payingGuard.current = false;
+        return;
+      }
+
       // Find-or-create customer by email (SECURITY DEFINER RPC) to avoid
       // duplicate customer rows from repeated public bookings.
       const { data: customerId, error: customerErr } = await supabase.rpc(
@@ -1389,7 +1465,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       {/* Header */}
       <header className="rm-header">
         <div className="rm-header-inner">
-          <div className="rm-logo">Rooms <span>Madrid</span></div>
+          <a href="https://www.roomsmadrid.es/" target="_blank" rel="noreferrer" aria-label="Rooms Madrid">
+            <img className="rm-logo-img" src="/brand/rooms-madrid-horizontal-blanco.svg" alt="Rooms Madrid" />
+          </a>
 
           {step !== "search" && step !== "done" && (
             <button className="rm-back" onClick={handleBack}>← Atrás</button>
@@ -1402,9 +1480,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
             style={{
               marginLeft: "auto",
               display: "flex", alignItems: "center", gap: 6,
-              background: "var(--gold)", color: "var(--ink)",
+              background: "linear-gradient(180deg, var(--blood-light) 0%, var(--blood) 100%)", color: "#fff",
               borderRadius: 7, padding: "6px 14px",
-              fontSize: 12, fontWeight: 500, letterSpacing: "0.05em",
+              fontSize: 12, fontWeight: 600, letterSpacing: "0.05em",
               textDecoration: "none", whiteSpace: "nowrap",
               transition: "background 0.2s",
             }}
@@ -1568,7 +1646,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                     value={String(people)}
                     onChange={e => setPeople(Number(e.target.value))}
                   >
-                    {[2, 3, 4].map(n => <option key={n} value={String(n)}>{n} personas</option>)}
+                    {/* Noche completa: solo 2 personas (no hay suplemento 3ª/4ª
+                        persona en tarifa de noche). Por horas: 2, 3 o 4. */}
+                    {(isOvernight ? [2] : [2, 3, 4]).map(n => <option key={n} value={String(n)}>{n} personas</option>)}
                   </select>
                 </div>
 
@@ -1598,7 +1678,12 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 <div className="rm-rooms-list">
                   {availableRooms.map(r => {
                     const fromPrice = fromPriceByRoom.get(r.id);
-                    const unavailable = conflicts?.has(r.id);
+                    // A room is unavailable for booking when it has a time conflict
+                    // with an existing reservation OR when staff set its manual
+                    // status to anything other than "available" (ocupada, limpieza,
+                    // fuera de servicio) in the admin panel.
+                    const statusBlocked = r.status !== "available";
+                    const unavailable = conflicts?.has(r.id) || statusBlocked;
                     // Rooms flagged hourly-only are greyed out while the overnight
                     // option is active (they can only be booked by the hour).
                     const overnightBlocked = isOvernight && r.allows_overnight === false;
@@ -1616,10 +1701,12 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                                 <>
                                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                                     <span style={{ fontSize: 16 }}>🔒</span>
-                                    No disponible para este horario
+                                    {statusBlocked && !conflicts?.has(r.id)
+                                      ? "No está disponible en este momento"
+                                      : "No disponible para este horario"}
                                   </div>
                                   <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, opacity: 0.85 }}>
-                                    {CONTACTS[building]?.phones.map((p, i) => (
+                                    {CONTACTS[buildingKey(r.building)]?.phones.map((p, i) => (
                                       <a key={i} href={p.href} style={{ color: "var(--gold-light)", textDecoration: "none", fontWeight: 500 }}>
                                         {p.number}
                                       </a>
@@ -1735,7 +1822,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                                 {extrasTotalSelected > 0 && (
                                   <div style={{ paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>Extras seleccionados</span>
-                                    <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: "var(--gold-dark)", fontWeight: 500 }}>{eur(extrasTotalSelected)}</span>
+                                    <span style={{ fontFamily: "'Playfair', serif", fontSize: 20, color: "var(--gold-dark)", fontWeight: 500 }}>{eur(extrasTotalSelected)}</span>
                                   </div>
                                 )}
                               </>
@@ -1780,7 +1867,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 <RoomImageCarousel images={getRoomImages(room)} alt={room.name} height={260} />
                 <div style={{ padding: "24px 28px" }}>
                   <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 6 }}>RM {room.building}</div>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 30, fontWeight: 500, color: "var(--ink)", marginBottom: 12 }}>{room.name}</div>
+                  <div style={{ fontFamily: "'Playfair', serif", fontSize: 30, fontWeight: 500, color: "var(--ink)", marginBottom: 12 }}>{room.name}</div>
                   <div className="rm-room-badges">
                     <span className="rm-badge"><Users size={11} />{room.capacity}+ personas</span>
                     {room.jacuzzi !== "none" && <span className="rm-badge"><Bath size={11} />Con jacuzzi</span>}
@@ -2031,7 +2118,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   background: "#25D366", color: "#fff", cursor: paying ? "not-allowed" : "pointer",
                   fontSize: 14, fontWeight: 500, letterSpacing: "0.04em",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  fontFamily: "'DM Sans', sans-serif", opacity: paying ? 0.5 : 1,
+                  fontFamily: "'Noto Sans', sans-serif", opacity: paying ? 0.5 : 1,
                   transition: "filter 0.2s",
                 }}
                 onMouseEnter={e => (e.currentTarget.style.filter = "brightness(0.93)")}
@@ -2077,17 +2164,51 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       </main>
 
       <footer className="rm-footer">
-        <div>© Rooms Madrid · Solo +18 · Bebe con responsabilidad</div>
-        <div>Pago: <strong>30% online</strong>, resto en el hotel · Confirmación inmediata por email</div>
-        <div style={{ marginTop: 8, display: "flex", justifyContent: "center", gap: 24, flexWrap: "wrap" }}>
-          {CONTACTS[building]?.phones.map((p, i) => (
-            <a key={i} href={p.href} style={{ color: "var(--gold-light)", textDecoration: "none" }}>{p.number}</a>
-          ))}
-          <a href={`mailto:${CONTACTS[building]?.email}`} style={{ color: "var(--gold-light)", textDecoration: "none" }}>
-            {CONTACTS[building]?.email}
-          </a>
+        <div className="rm-footer-inner">
+          <div>
+            <img className="rm-footer-logo" src="/brand/rooms-madrid-horizontal-blanco.svg" alt="Rooms Madrid" />
+            <p className="rm-footer-about">
+              Hotel para parejas en Madrid, único en su clase. Centramos nuestros esfuerzos
+              en tu comodidad y discreción. Suites diseñadas para vuestro disfrute, solo +18.
+            </p>
+          </div>
+
+          <div className="rm-footer-col">
+            <h4>Contacto</h4>
+            {BUILDINGS.map(b => (
+              <p key={b.value}>
+                {b.label.replace("RM ", "")}:{" "}
+                <a href={CONTACTS[b.value]?.phones[0]?.href}>{CONTACTS[b.value]?.phones[0]?.number}</a>
+              </p>
+            ))}
+            <p><a href="mailto:reservas@roomsmadrid.es">reservas@roomsmadrid.es</a></p>
+          </div>
+
+          <div className="rm-footer-col">
+            <h4>Síguenos</h4>
+            <div className="rm-footer-social">
+              <a href="https://www.instagram.com/rooms_madrid/" target="_blank" rel="nofollow noopener" aria-label="Instagram">
+                <img src="/brand/icons/icon-ig.png" alt="Instagram" loading="lazy" />
+              </a>
+              <a href="https://www.youtube.com/channel/UCjwTmW2N9wQN53ugeETpdvg" target="_blank" rel="nofollow noopener" aria-label="YouTube">
+                <img src="/brand/icons/icon-youtube.png" alt="YouTube" loading="lazy" />
+              </a>
+              <a href="https://www.tiktok.com/@rooms.madrid" target="_blank" rel="nofollow noopener" aria-label="TikTok">
+                <img src="/brand/icons/icon-tiktok.png" alt="TikTok" loading="lazy" />
+              </a>
+            </div>
+            <h4>Información</h4>
+            <p><a href="https://www.roomsmadrid.es/condiciones-de-reserva" target="_blank" rel="nofollow noopener">Condiciones de reserva</a></p>
+            <p><a href="https://www.roomsmadrid.es/politica-de-privacidad" target="_blank" rel="nofollow noopener">Política de privacidad</a></p>
+            <p><a href="https://www.roomsmadrid.es/politica-de-cookies" target="_blank" rel="nofollow noopener">Política de cookies</a></p>
+            <p><a href="https://www.roomsmadrid.es/aviso-legal" target="_blank" rel="nofollow noopener">Aviso legal</a></p>
+          </div>
         </div>
-        <div style={{ marginTop: 4, color: "rgba(255,255,255,0.3)" }}>{CONTACTS[building]?.address}</div>
+
+        <div className="rm-footer-bottom">
+          <div>© Rooms Madrid · Solo +18 · Bebe con responsabilidad</div>
+          <div>Pago: <strong>30% online</strong>, resto en el hotel · Confirmación inmediata por email</div>
+        </div>
       </footer>
     </div>
   );
@@ -2152,7 +2273,7 @@ function SummaryBar({
           {breakdown.dynamicSurcharge > 0 && (
             <div className="rm-summary-row">
               <span>Recargo</span>
-              <span className="rm-summary-row-val" style={{ color: "#fcd34d" }}>{eur(breakdown.dynamicSurcharge)}</span>
+              <span className="rm-summary-row-val" style={{ color: "var(--gold-light)" }}>{eur(breakdown.dynamicSurcharge)}</span>
             </div>
           )}
           {breakdown.extrasTotal > 0 && (

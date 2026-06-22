@@ -135,6 +135,157 @@ function buildOrder(reservationId: string): string {
   return `${mm}${dd}${uuidHex}${tsHex}`; // 12 chars, starts with 4 digits
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+interface AuthoritativeAmounts {
+  base: number;
+  thirdPerson: number;
+  dynamicSurcharge: number;
+  dynamicReason: string | null;
+  extrasTotal: number;
+  discount: number;
+  total: number;
+  deposit: number;
+}
+
+/**
+ * Recomputes the authoritative booking total + 30% deposit on the server,
+ * mirroring src/lib/pricing.ts and src/lib/promos.ts. Reads only trusted data:
+ * the room's rate group, the rate tables, active dynamic rules, the reservation's
+ * own extras rows and (if any) its DB promo code. Never trusts client amounts.
+ */
+// deno-lint-ignore no-explicit-any
+async function computeAuthoritativeAmounts(supabase: any, reservation: any): Promise<AuthoritativeAmounts> {
+  const startAt = new Date(reservation.start_at);
+  const endAt = new Date(reservation.end_at);
+  const isOvernight: boolean = !!reservation.is_overnight;
+  const withJacuzzi: boolean = !!reservation.with_jacuzzi;
+  const people: number = Number(reservation.people ?? 2);
+
+  const { data: room } = await supabase
+    .from("rooms").select("rate_group_id, jacuzzi").eq("id", reservation.room_id).single();
+  const rateGroupId: string | null = room?.rate_group_id ?? null;
+  // Jacuzzi billing follows the room type, exactly like the client.
+  const effectiveJacuzzi =
+    room?.jacuzzi === "always" ? true : room?.jacuzzi === "none" ? false : withJacuzzi;
+
+  // Duration snapped to 30-min steps and clamped to 60..360, matching the
+  // client's `pricingDuration` used for the rate-table lookup.
+  const rawMin = Math.round((endAt.getTime() - startAt.getTime()) / 60000);
+  const clamped = Math.min(360, Math.max(60, rawMin));
+  const durationMin = Math.min(360, Math.max(60, Math.ceil(clamped / 30) * 30));
+
+  let base = 0;
+  if (rateGroupId) {
+    if (isOvernight) {
+      const { data } = await supabase
+        .from("rate_overnight").select("price")
+        .eq("rate_group_id", rateGroupId).eq("checkout_time", "10:00:00").maybeSingle();
+      base = Number(data?.price ?? 0);
+    } else {
+      const { data } = await supabase
+        .from("rate_hourly").select("price_with_jacuzzi, price_without_jacuzzi")
+        .eq("rate_group_id", rateGroupId).eq("duration_min", durationMin).maybeSingle();
+      base = Number((effectiveJacuzzi ? data?.price_with_jacuzzi : data?.price_without_jacuzzi) ?? 0);
+    }
+  }
+
+  // Third-person surcharge (hourly only)
+  let thirdPerson = 0;
+  if (!isOvernight && people > 2) {
+    const { data } = await supabase
+      .from("rate_third_person").select("surcharge").eq("duration_min", durationMin).maybeSingle();
+    thirdPerson = Number(data?.surcharge ?? 0) * (people - 2);
+  }
+
+  // Dynamic surcharge (date + occupancy rules)
+  let dynamicSurcharge = 0;
+  let dynamicReason: string | null = null;
+  const { data: rules } = await supabase.from("dynamic_rules").select("*").eq("active", true);
+  if (rules) {
+    for (const r of rules) {
+      if (r.type !== "date") continue;
+      const cfg = (r.config ?? {}) as { from?: string; to?: string };
+      if (!cfg.from || !cfg.to) continue;
+      const d = startAt.toISOString().slice(0, 10);
+      if (d >= cfg.from && d <= cfg.to) {
+        const mult = Number(r.multiplier ?? 0);
+        dynamicSurcharge += (base + thirdPerson) * (mult / 100);
+        dynamicReason = (dynamicReason ? dynamicReason + " · " : "") + `${r.name} (+${mult}%)`;
+      }
+    }
+    const occRules = rules
+      .filter((r: any) => r.type === "occupancy")
+      .sort((a: any, b: any) =>
+        ((b.config ?? {}).threshold ?? 0) - ((a.config ?? {}).threshold ?? 0));
+    if (occRules.length > 0) {
+      const dayStart = new Date(startAt);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      const [{ count: occ }, { count: total }] = await Promise.all([
+        supabase.from("reservations").select("id", { count: "exact", head: true })
+          .gte("start_at", dayStart.toISOString()).lt("start_at", dayEnd.toISOString())
+          .in("status", ["confirmed", "in_progress", "completed"]),
+        supabase.from("rooms").select("id", { count: "exact", head: true }).eq("active", true),
+      ]);
+      const ratio = ((occ ?? 0) / (total ?? 1)) * 100;
+      for (const r of occRules) {
+        const threshold = ((r.config ?? {}) as { threshold?: number }).threshold ?? 0;
+        if (ratio >= threshold) {
+          const mult = Number(r.multiplier ?? 0);
+          dynamicSurcharge += (base + thirdPerson) * (mult / 100);
+          dynamicReason = (dynamicReason ? dynamicReason + " · " : "") + `Ocupación ${Math.round(ratio)}% (+${mult}%)`;
+          break;
+        }
+      }
+    }
+  }
+
+  // Extras the customer actually pays for (gifted rows are free → unit_price 0).
+  const { data: exRows } = await supabase
+    .from("reservation_extras").select("qty, unit_price, is_gift").eq("reservation_id", reservation.id);
+  const extrasTotal = (exRows ?? [])
+    .filter((e: any) => !e.is_gift)
+    .reduce((s: number, e: any) => s + Number(e.qty ?? 0) * Number(e.unit_price ?? 0), 0);
+
+  // Promo discount (room subtotal only — extras never discounted)
+  const roomSubtotal = round2(base + thirdPerson + dynamicSurcharge);
+  let discount = 0;
+  if (reservation.promo_code_id) {
+    const { data: promo } = await supabase
+      .from("promo_codes")
+      .select("discount_type, discount_value, active, archived, valid_from, valid_until")
+      .eq("id", reservation.promo_code_id).maybeSingle();
+    // Only honour a still-valid promo (defends against later-disabled codes).
+    const now = new Date();
+    const valid = promo && promo.active && !promo.archived &&
+      (!promo.valid_from || new Date(promo.valid_from) <= now) &&
+      (!promo.valid_until || new Date(promo.valid_until) >= now);
+    if (valid) {
+      const raw = promo.discount_type === "percent"
+        ? (roomSubtotal * Number(promo.discount_value)) / 100
+        : Math.min(Number(promo.discount_value), roomSubtotal);
+      discount = round2(Math.max(0, raw));
+    }
+  }
+
+  const total = round2(Math.max(0, base + thirdPerson + dynamicSurcharge + extrasTotal - discount));
+  const deposit = round2(total * 0.3);
+  return {
+    base: round2(base),
+    thirdPerson: round2(thirdPerson),
+    dynamicSurcharge: round2(dynamicSurcharge),
+    dynamicReason,
+    extrasTotal: round2(extrasTotal),
+    discount,
+    total,
+    deposit,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
@@ -149,15 +300,54 @@ Deno.serve(async (req) => {
 
     const { data: reservation, error: dbErr } = await supabase
       .from("reservations")
-      .select("id, deposit_amount, deposit_paid, promo_code_id")
+      .select(
+        "id, deposit_amount, deposit_paid, promo_code_id, room_id, start_at, end_at, " +
+        "is_overnight, with_jacuzzi, people, total, manual_override",
+      )
       .eq("id", reservation_id)
       .single();
 
     if (dbErr || !reservation) return json({ error: "Reserva no encontrada" }, 404);
     if (reservation.deposit_paid) return json({ error: "Esta reserva ya tiene el depósito pagado" }, 409);
 
+    // ── Server-side amount validation ─────────────────────────────────────
+    // The booking total/deposit are computed in the browser and stored on the
+    // reservation, so a tampered client could lower them. We recompute the
+    // authoritative amount here from trusted structural fields (room rate group,
+    // dates, jacuzzi, people, extras rows, DB promo code) and charge THAT,
+    // overriding the stored value when it diverges. (Client-only debug discount
+    // codes have no DB promo row, so they no longer reduce the real charge —
+    // use REDSYS_BYPASS for no-charge testing instead.)
+    //
+    // Staff-priced bookings (manual_override) are trusted as-is: reception/admin
+    // can set a custom total that the rate tables don't reproduce, so we must not
+    // recompute them. The public booking flow always creates manual_override=false.
+    let depositAmount = Number(reservation.deposit_amount);
+    if (!reservation.manual_override) {
+      const authoritative = await computeAuthoritativeAmounts(supabase, reservation);
+      depositAmount = authoritative.deposit;
+      if (Math.abs(depositAmount - Number(reservation.deposit_amount)) > 0.01) {
+        console.warn("create-redsys-payment: deposit mismatch — overriding with server value", {
+          reservation_id,
+          clientDeposit: Number(reservation.deposit_amount),
+          serverDeposit: depositAmount,
+          clientTotal: Number(reservation.total),
+          serverTotal: authoritative.total,
+        });
+        await supabase.from("reservations").update({
+          base_price: authoritative.base,
+          third_person_surcharge: authoritative.thirdPerson,
+          dynamic_surcharge: authoritative.dynamicSurcharge,
+          dynamic_reason: authoritative.dynamicReason,
+          extras_total: authoritative.extrasTotal,
+          discount_amount: authoritative.discount,
+          total: authoritative.total,
+          deposit_amount: depositAmount,
+        }).eq("id", reservation_id);
+      }
+    }
+
     // Guard: deposit must be > 0 (Redsys rejects zero-amount transactions)
-    const depositAmount = Number(reservation.deposit_amount);
     if (!depositAmount || depositAmount <= 0) {
       return json({ error: "El importe del depósito no es válido" }, 422);
     }

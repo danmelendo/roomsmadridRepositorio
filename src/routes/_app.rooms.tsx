@@ -40,14 +40,19 @@ function RoomsPage() {
   const [editingName, setEditingName] = useState("");
 
   // Habitaciones con una reserva en curso (check-in realizado) se muestran como
-  // ocupadas, independientemente de su estado manual.
+  // ocupadas, independientemente de su estado manual. Solo cuentan las reservas
+  // cuyo horario sigue vigente (end_at en el futuro): el paso in_progress →
+  // completed es manual, así que una reserva a la que recepción olvidó dar
+  // "Finalizar" quedaría in_progress para siempre y marcaría la habitación como
+  // ocupada aunque ya esté libre. Filtrando por end_at evitamos ese falso "en curso".
   const { data: inProgressRoomIds } = useQuery({
     queryKey: ["rooms", "in_progress_room_ids"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservations")
         .select("room_id")
-        .eq("status", "in_progress");
+        .eq("status", "in_progress")
+        .gt("end_at", new Date().toISOString());
       if (error) throw error;
       return new Set((data ?? []).map((r) => r.room_id));
     },
@@ -206,7 +211,11 @@ function RoomsPage() {
                       Reserva en curso (check-in realizado)
                     </p>
                   )}
-                  <Select value={r.status} onValueChange={(v) => updateStatus.mutate({ id: r.id, status: v })}>
+                  {/* When a reservation is in progress the room is occupied by an
+                      active guest, so we show that effective status and lock the
+                      manual selector until checkout — otherwise it would
+                      contradictorily read "Disponible" while occupied. */}
+                  <Select value={displayStatus} disabled={autoOccupied} onValueChange={(v) => updateStatus.mutate({ id: r.id, status: v })}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {Object.entries(STATUS_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}

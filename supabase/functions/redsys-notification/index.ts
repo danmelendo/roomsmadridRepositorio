@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
     if (reservation && !reservation.deposit_paid) {
       const { error: rejErr } = await supabase
         .from("reservations")
-        .update({ status: "rejected" })
+        .update({ status: "rejected", cancellation_reason: `Pago rechazado por el banco (código ${responseCode})` })
         .eq("id", reservation.id);
       if (rejErr) console.error("redsys-notification: failed to mark rejected for order", order, rejErr);
     }
