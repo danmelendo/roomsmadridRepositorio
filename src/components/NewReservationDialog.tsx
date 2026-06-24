@@ -278,14 +278,32 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
         throw new Error("Nombre y email son obligatorios");
       }
 
-      // Customer. In edit mode, update the already-linked customer in place;
-      // otherwise find by phone/email or create.
+      // Customer. El nombre pertenece a ESTA reserva (identificada por su id), no
+      // a un cliente compartido: como no hay login, puede haber muchos "Carlos".
+      // En edición, si la ficha de cliente la usan OTRAS reservas, creamos una
+      // ficha nueva para esta reserva (así no les cambiamos el nombre a las demás);
+      // si es exclusiva de esta reserva, la actualizamos en sitio.
       let customerId: string | null = isEdit ? loadedCustomerId : null;
       if (isEdit && loadedCustomerId) {
-        await supabase
-          .from("customers")
-          .update({ name: customerName || null, phone: customerPhone || null, email: customerEmail || null })
-          .eq("id", loadedCustomerId);
+        const { count: usedByOthers } = await supabase
+          .from("reservations")
+          .select("id", { count: "exact", head: true })
+          .eq("customer_id", loadedCustomerId)
+          .neq("id", editReservationId!);
+        if ((usedByOthers ?? 0) > 0) {
+          const { data: c, error } = await supabase
+            .from("customers")
+            .insert({ name: customerName || null, phone: customerPhone || null, email: customerEmail || null })
+            .select("id")
+            .single();
+          if (error) throw error;
+          customerId = c.id;
+        } else {
+          await supabase
+            .from("customers")
+            .update({ name: customerName || null, phone: customerPhone || null, email: customerEmail || null })
+            .eq("id", loadedCustomerId);
+        }
       } else if (customerPhone || customerName || customerEmail) {
         if (customerPhone) {
           const { data: existing } = await supabase

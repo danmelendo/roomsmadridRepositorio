@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Bath, Droplet, Users, CalendarIcon, Sparkles,
+  CalendarIcon,
   ShieldCheck, CheckCircle2, CreditCard, Plus, Minus, Gift,
   Phone, ChevronRight, Tv, Moon, Clock, Star, Flame, MapPin, Globe, MessageCircle,
 } from "lucide-react";
@@ -53,7 +53,20 @@ const ROOM_IMAGES_MAP: Record<string, Record<string, string[]>> = {
       "/imagenes/Ventas/Hollywood/Hollywood_3.jpeg",
       "/imagenes/Ventas/Hollywood/Hollywood_4.jpeg",
     ],
-    "Music": ["/imagenes/Ventas/Music/habitacion-romantica-hotel-madrid-ventas-music-2.webp"],
+    "Music": [
+      "/imagenes/Ventas/Music/habitacion-romantica-hotel-madrid-ventas-music-2.webp",
+      "/imagenes/Ventas/Music/habitacion-romantica-hotel-madrid-ventas-music-5.webp",
+      "/imagenes/Ventas/Music/15A1DD58-967F-44AF-9389-2999746452E1.png",
+      "/imagenes/Ventas/Music/1605D0D3-DC30-4DE8-AF92-41D334E9FB1F.png",
+      "/imagenes/Ventas/Music/2B9E4E98-28E7-4E62-862A-2CE1C4D0C857.png",
+      "/imagenes/Ventas/Music/7CB89554-92C8-470A-90A1-9D2C5326DFAB.png",
+      "/imagenes/Ventas/Music/894BD178-1999-446F-9F06-D70A9E8FA168.png",
+      "/imagenes/Ventas/Music/9C000FD8-B8DE-4392-883C-DD20B8681AAD.png",
+      "/imagenes/Ventas/Music/BBC52576-5AE2-4F39-870A-947F1112EF70.png",
+      "/imagenes/Ventas/Music/C6B73C3C-0758-4A03-B9EB-46DD4D41EEE2.png",
+      "/imagenes/Ventas/Music/DADF31B3-AB0C-4EDD-9486-3976D5FEB3E4.png",
+      "/imagenes/Ventas/Music/E699A73D-3ACA-40DF-9463-46FF0E1EE89B.png",
+    ],
     "Route 66": [
       "/imagenes/Ventas/Route 66/ruta66nueva.jpeg",
       "/imagenes/Ventas/Route 66/ruta66.jpeg",
@@ -120,6 +133,53 @@ function getRoomImages(r: { name: string; building: string }): string[] {
 // Returns the primary (first) photo for a room — used for thumbnails/summaries.
 function getRoomImage(r: { name: string; building: string }) {
   return getRoomImages(r)[0];
+}
+
+// Short, suggestive descriptions per room, inspired by each room's photos.
+// Kept brief on purpose so they don't cover the room screen excessively.
+const ROOM_DESCRIPTIONS: Record<string, Record<string, string>> = {
+  ventas: {
+    "Empire State": "La ciudad que nunca duerme a vuestros pies… y vosotros tampoco.",
+    "Grey": "Luces rojas y rincones de seducción para liberar la imaginación.",
+    "Hollywood": "Sed los protagonistas de vuestra propia película sin censura.",
+    "Music": "Luces de fiesta, ritmo y burbujas para subir el volumen de la pasión.",
+    "Route 66": "Una escapada salvaje por la ruta del deseo bajo un cielo de fuego.",
+  },
+  bernabeu: {
+    "Grey": "Penumbra, neón y juego: dejaos llevar sin reglas.",
+    "Ocean": "Sumergíos en las profundidades de una noche azul e infinita.",
+    "Paris": "La ciudad del amor enciende los sentidos al caer la tarde.",
+    "Safari": "Despertad vuestro lado más salvaje en plena sabana.",
+    "Tokyo": "Neón, pétalos y noche eléctrica: un Tokio hecho para dos.",
+  },
+  america: {
+    "Grey": "Cuero, neón rojo y penumbra: el escenario para perder el control.",
+    "Dubai": "Lujo de oro negro, champán y pétalos para una noche sin límites.",
+    "Maldivas": "Una isla privada donde el tiempo se detiene y solo existís vosotros.",
+    "New York": "Bajo las luces de Manhattan, una noche de cine para dos.",
+    "Tu y yo": "Solo vosotros, sin testigos: intimidad en estado puro.",
+  },
+};
+
+// Returns a tailored suggestive description for a room, falling back to a
+// generic line when the room has no bespoke copy registered.
+function getRoomDescription(r: { name: string; building: string; capacity: number }): string {
+  const building = r.building.toLowerCase();
+  const custom = ROOM_DESCRIPTIONS[building as keyof typeof ROOM_DESCRIPTIONS]?.[r.name];
+  if (custom) return custom;
+  return `Habitación temática para ${r.capacity} personas.`;
+}
+
+// Rooms that feature a screen. Shown as a single "Pantalla disponible" badge —
+// the previous capacity/jacuzzi badges were redundant and have been removed.
+const ROOMS_WITH_SCREEN: Record<string, string[]> = {
+  america: ["Dubai", "New York"],
+  ventas: ["Route 66", "Grey", "Music"],
+  bernabeu: ["Grey", "Safari"],
+};
+
+function hasScreen(r: { name: string; building: string }): boolean {
+  return ROOMS_WITH_SCREEN[buildingKey(r.building)]?.includes(r.name) ?? false;
 }
 
 // Real uploaded decoration photos shown in an auto-advancing carousel on every
@@ -863,6 +923,15 @@ const CSS = `
   .rm-deco-msg-hint.rm-over { color: #c0392b; }
 `;
 
+function defaultTime(): string {
+  const now = new Date();
+  const totalMin = now.getHours() * 60 + now.getMinutes();
+  const rounded = Math.ceil(totalMin / 15) * 15;
+  const h = Math.floor(rounded / 60) % 24;
+  const m = rounded % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 // ─────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────
@@ -877,7 +946,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
 
   // search
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("22:00");
+  const [time, setTime] = useState(defaultTime);
   const [duration, setDuration] = useState(120);
   const [isOvernight, setIsOvernight] = useState(false);
   const [people, setPeople] = useState(2);
@@ -1093,8 +1162,8 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     appliedSlugRef.current = true;
     setBuilding(initialEntry.building);
     setFeaturedName(initialEntry.name);
-    setDate((prev) => prev || format(new Date(), "yyyy-MM-dd"));
-    setDidSearch(true);
+    // Do NOT pre-fill date or auto-search: the user must choose date and time
+    // themselves so they don't see rooms blocked for a time they haven't picked.
   }, [initialEntry, rooms]);
 
   useEffect(() => {
@@ -1730,16 +1799,10 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                             <div className="rm-room-building">RM {r.building}</div>
                             <div className="rm-room-name rm-serif">{r.name}</div>
                             <div className="rm-room-badges">
-                              <span className="rm-badge"><Users size={11} />{r.capacity}+ personas</span>
-                              {r.jacuzzi !== "none" && <span className="rm-badge"><Bath size={11} />Con jacuzzi</span>}
-                              {r.jacuzzi === "none" && <span className="rm-badge"><Droplet size={11} />Sin jacuzzi</span>}
-                              {r.has_tv && <span className="rm-badge"><Tv size={11} />TV</span>}
-                              {r.has_swing && <span className="rm-badge"><Sparkles size={11} />Columpio</span>}
+                              {hasScreen(r) && <span className="rm-badge"><Tv size={11} />Pantalla disponible</span>}
                             </div>
                             <div className="rm-room-desc">
-                              Habitación temática para {r.capacity} personas.
-                              {r.has_swing ? " Incluye columpio del amor." : ""}
-                              {r.has_tv ? " Pantalla disponible." : ""}
+                              {getRoomDescription(r)}
                             </div>
                           </div>
                           <div className="rm-room-cta">
@@ -1869,10 +1932,47 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 6 }}>RM {room.building}</div>
                   <div style={{ fontFamily: "'Playfair', serif", fontSize: 30, fontWeight: 500, color: "var(--ink)", marginBottom: 12 }}>{room.name}</div>
                   <div className="rm-room-badges">
-                    <span className="rm-badge"><Users size={11} />{room.capacity}+ personas</span>
-                    {room.jacuzzi !== "none" && <span className="rm-badge"><Bath size={11} />Con jacuzzi</span>}
-                    {room.has_tv && <span className="rm-badge"><Tv size={11} />TV</span>}
-                    {room.has_swing && <span className="rm-badge"><Sparkles size={11} />Columpio</span>}
+                    {hasScreen(room) && <span className="rm-badge"><Tv size={11} />Pantalla disponible</span>}
+                  </div>
+
+                  {/* Contact options */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+                    {WHATSAPP_NUMBERS[building] && (
+                      <a
+                        href={`https://wa.me/${WHATSAPP_NUMBERS[building].intl}?text=${encodeURIComponent(`Hola, quiero consultar sobre la habitación ${room.name} (RM ${room.building})`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                          height: 48, borderRadius: 10, background: "#25D366", color: "#fff",
+                          fontSize: 13, fontWeight: 600, letterSpacing: "0.06em",
+                          textDecoration: "none", textTransform: "uppercase",
+                          fontFamily: "'Noto Sans', sans-serif",
+                        }}
+                      >
+                        <MessageCircle size={16} /> Consulta por WhatsApp
+                      </a>
+                    )}
+                    {CONTACTS[building]?.phones[1] && (
+                      <a
+                        href={CONTACTS[building].phones[1].href}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                          height: 48, borderRadius: 10, border: "1.5px solid var(--border-strong)",
+                          background: "var(--warm-white)", color: "var(--ink)",
+                          fontSize: 13, fontWeight: 600, letterSpacing: "0.06em",
+                          textDecoration: "none", textTransform: "uppercase",
+                          fontFamily: "'Noto Sans', sans-serif",
+                        }}
+                      >
+                        <Phone size={16} /> Consulta por teléfono
+                      </a>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "2px 0" }}>
+                      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                      <span style={{ fontSize: 11, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.1em" }}>o reserva online</span>
+                      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                    </div>
                   </div>
 
                 </div>
@@ -2102,34 +2202,40 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 Pago seguro procesado por Redsys · Redirección al TPV de tu banco
               </p>
 
-              {/* Alternative: book via WhatsApp (no card payment, no Redsys) */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 16px" }}>
-                <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-soft)" }}>o</span>
-                <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-              </div>
+              {/* Alternative: book via WhatsApp (no card payment, no Redsys).
+                  Hidden for bookings over 3h (and overnight) — those must go
+                  through the card flow on the public web. */}
+              {!isOvernight && pricingDuration <= 180 && (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 16px" }}>
+                    <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                    <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-soft)" }}>o</span>
+                    <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                  </div>
 
-              <button
-                type="button"
-                onClick={reserveViaWhatsApp}
-                disabled={paying}
-                style={{
-                  width: "100%", height: 52, borderRadius: 10, border: "none",
-                  background: "#25D366", color: "#fff", cursor: paying ? "not-allowed" : "pointer",
-                  fontSize: 14, fontWeight: 500, letterSpacing: "0.04em",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  fontFamily: "'Noto Sans', sans-serif", opacity: paying ? 0.5 : 1,
-                  transition: "filter 0.2s",
-                }}
-                onMouseEnter={e => (e.currentTarget.style.filter = "brightness(0.93)")}
-                onMouseLeave={e => (e.currentTarget.style.filter = "none")}
-              >
-                <MessageCircle size={18} /> Reservar por WhatsApp (sin pago online)
-              </button>
+                  <button
+                    type="button"
+                    onClick={reserveViaWhatsApp}
+                    disabled={paying}
+                    style={{
+                      width: "100%", height: 52, borderRadius: 10, border: "none",
+                      background: "#25D366", color: "#fff", cursor: paying ? "not-allowed" : "pointer",
+                      fontSize: 14, fontWeight: 500, letterSpacing: "0.04em",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      fontFamily: "'Noto Sans', sans-serif", opacity: paying ? 0.5 : 1,
+                      transition: "filter 0.2s",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.filter = "brightness(0.93)")}
+                    onMouseLeave={e => (e.currentTarget.style.filter = "none")}
+                  >
+                    <MessageCircle size={18} /> Reservar por WhatsApp (sin pago online)
+                  </button>
 
-              <p style={{ fontSize: 11, color: "var(--ink-soft)", textAlign: "center", marginTop: 10 }}>
-                Te abriremos un chat con los datos de tu reserva. Sin pago con tarjeta · Confirmación con recepción
-              </p>
+                  <p style={{ fontSize: 11, color: "var(--ink-soft)", textAlign: "center", marginTop: 10 }}>
+                    Te abriremos un chat con los datos de tu reserva. Sin pago con tarjeta · Confirmación con recepción
+                  </p>
+                </>
+              )}
             </div>
             <SummaryBar room={room} startAt={startAt} endAt={endAt} people={people} isOvernight={isOvernight} duration={pricingDuration} breakdown={breakdown} />
           </div>

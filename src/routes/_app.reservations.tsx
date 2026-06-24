@@ -170,7 +170,16 @@ function ReservationsPage() {
                             : null;
                         })()}
                       </td>
-                      <td className="p-2 text-right font-medium tabular-nums">{eur(Number(r.total))}</td>
+                      <td className="p-2 text-right font-medium tabular-nums">
+                        {eur(Number(r.total))}
+                        {/* Reservas de web pública: importe realmente cobrado al
+                            TPV (depósito, ya con descuentos/promos aplicados). */}
+                        {r.created_by_role === "public" && r.deposit_paid && (
+                          <div className="text-xs font-normal text-emerald-700 dark:text-emerald-300">
+                            Pagado web: {eur(Number(r.paid_amount))}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-2 text-right">
                         {r.status !== "cancelled" && r.status !== "rejected" && r.status !== "completed" && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setCancelReason(""); setCancelTarget(r.id); }} title="Cancelar">
