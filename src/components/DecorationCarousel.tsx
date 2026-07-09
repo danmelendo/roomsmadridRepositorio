@@ -13,7 +13,7 @@ export function DecorationCarousel({
   intervalMs?: number;
   height?: number;
 }) {
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(() => Math.floor(Math.random() * Math.max(1, images.length)));
 
   useEffect(() => {
     if (images.length <= 1) return;

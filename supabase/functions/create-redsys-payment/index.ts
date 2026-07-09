@@ -36,6 +36,70 @@ function json(data: unknown, status = 200) {
   });
 }
 
+interface DynamicDateConfig {
+  from?: string;
+  to?: string;
+  weekdays?: number[];
+  timeFrom?: string;
+  timeTo?: string;
+  windows?: { weekday: number; from: string; to: string }[];
+}
+
+const MADRID_TIME_ZONE = "Europe/Madrid";
+
+function madridParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: MADRID_TIME_ZONE,
+    weekday: "short",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const hour = Number(byType.hour === "24" ? "0" : byType.hour);
+  const minute = Number(byType.minute ?? 0);
+  return {
+    date: `${byType.year}-${byType.month}-${byType.day}`,
+    weekday: weekdayMap[byType.weekday] ?? date.getDay(),
+    minuteOfDay: hour * 60 + minute,
+  };
+}
+
+function timeToMinutes(value: string | undefined, fallback: number) {
+  if (!value) return fallback;
+  if (value === "24:00") return 24 * 60;
+  const [h, m] = value.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallback;
+  return h * 60 + m;
+}
+
+function isWithinTime(minuteOfDay: number, from?: string, to?: string) {
+  const start = timeToMinutes(from, 0);
+  const end = timeToMinutes(to, 24 * 60);
+  if (start === end) return true;
+  if (start < end) return minuteOfDay >= start && minuteOfDay < end;
+  return minuteOfDay >= start || minuteOfDay < end;
+}
+
+function matchesDateRule(config: DynamicDateConfig, startAt: Date) {
+  const parts = madridParts(startAt);
+  if (config.from && parts.date < config.from) return false;
+  if (config.to && parts.date > config.to) return false;
+
+  if (config.windows?.length) {
+    return config.windows.some(
+      (w) => w.weekday === parts.weekday && isWithinTime(parts.minuteOfDay, w.from, w.to),
+    );
+  }
+
+  if (config.weekdays?.length && !config.weekdays.includes(parts.weekday)) return false;
+  return isWithinTime(parts.minuteOfDay, config.timeFrom, config.timeTo);
+}
+
 // ── Pure-JS 3DES (ECB, single block) ─────────────────────────────────────────
 // Deno/OpenSSL 3.x disables legacy DES ciphers, so we cannot use createCipheriv.
 // Redsys only encrypts one 8-byte block (no CBC chaining needed).
@@ -207,10 +271,8 @@ async function computeAuthoritativeAmounts(supabase: any, reservation: any): Pro
   if (rules) {
     for (const r of rules) {
       if (r.type !== "date") continue;
-      const cfg = (r.config ?? {}) as { from?: string; to?: string };
-      if (!cfg.from || !cfg.to) continue;
-      const d = startAt.toISOString().slice(0, 10);
-      if (d >= cfg.from && d <= cfg.to) {
+      const cfg = (r.config ?? {}) as DynamicDateConfig;
+      if (matchesDateRule(cfg, startAt)) {
         const mult = Number(r.multiplier ?? 0);
         dynamicSurcharge += (base + thirdPerson) * (mult / 100);
         dynamicReason = (dynamicReason ? dynamicReason + " · " : "") + `${r.name} (+${mult}%)`;

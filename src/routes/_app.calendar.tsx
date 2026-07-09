@@ -43,7 +43,8 @@ function CalendarPage() {
         .from("reservations")
         .select("*, customers(name,phone)")
         .gte("start_at", new Date(day.getTime() - 12 * 3600 * 1000).toISOString())
-        .lt("start_at", new Date(dayEnd.getTime() + 12 * 3600 * 1000).toISOString());
+        .lt("start_at", new Date(dayEnd.getTime() + 12 * 3600 * 1000).toISOString())
+        .not("status", "in", '("cancelled","rejected","no_show")');
       if (error) throw error;
       return data;
     },
@@ -128,7 +129,7 @@ function CalendarPage() {
                   ))}
                   {/* Reservations */}
                   {reservations
-                    ?.filter((r) => r.room_id === room.id && r.status !== "cancelled" && r.status !== "no_show")
+                    ?.filter((r) => r.room_id === room.id && r.status !== "cancelled" && r.status !== "no_show" && r.status !== "rejected")
                     .map((r) => {
                       const s = new Date(r.start_at);
                       const e = new Date(r.end_at);

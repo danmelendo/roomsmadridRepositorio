@@ -1,0 +1,141 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- PENDIENTE / TODO — Alta de 3 habitaciones nuevas en RM VENTAS
+--   · Miami
+--   · Bali Deluxe
+--   · Cairo
+--
+-- Estado: NO APLICAR TODAVÍA. Estas salas aún no están disponibles.
+--
+-- Este fichero vive a propósito en `supabase/pending-migrations/` (NO en
+-- `supabase/migrations/`) para que el CLI de Supabase NO lo ejecute ni lo
+-- registre como migración aplicada. Además el SQL está comentado como doble
+-- seguro.
+--
+-- ─── CÓMO ACTIVARLO cuando den el OK ─────────────────────────────────────────
+--   1. Rellenar los precios reales (marcados con «TODO PRECIO» abajo) y decidir
+--      si cada sala lleva jacuzzi (`jacuzzi_option`: 'always' | 'optional' |
+--      'none'), columpio (`has_swing`), pantalla/TV (`has_tv`) y si admite
+--      noche completa (`allows_overnight`).
+--   2. Descomentar el bloque SQL (quitar los `-- ` de cada línea del cuerpo).
+--   3. MOVER este fichero a `supabase/migrations/` y RENOMBRARLO con un
+--      timestamp fresco, p.ej. `20260701120000_add_ventas_rooms_miami_bali_cairo.sql`.
+--   4. Aplicar (`supabase db push` o el flujo de despliegue habitual).
+--   5. En el frontend, descomentar los TODO correspondientes en:
+--        · src/lib/roomSlugs.ts        (enlaces /reservar-miami, etc.)
+--        · src/routes/reservar.tsx     (fotos, descripciones y flags de
+--                                       pantalla / cubo LED / columpio)
+--      y subir las fotos reales a /public/imagenes/Ventas/<Sala>/.
+--
+-- NOTA sobre TARIFAS: se crea un `rate_group` por sala para poder tarifarlas de
+-- forma independiente (aparecerán en el panel de Tarifas). Si se prefiere
+-- reutilizar una tarifa existente (p.ej. 'Music/Empire/Paris/Space/Ocean'),
+-- omitir la creación del grupo y asignar ese `rate_group_id` en el INSERT de
+-- `rooms`.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- begin;
+
+-- ─── 1) Grupos de tarifa (uno por sala) ──────────────────────────────────────
+-- insert into rate_groups (name)
+-- values
+--   ('Miami'),
+--   ('Bali Deluxe'),
+--   ('Cairo')
+-- on conflict (name) do nothing;
+
+-- ─── 2) Alta de las habitaciones en RM Ventas ────────────────────────────────
+-- Idempotente: ON CONFLICT (building, name) DO NOTHING.
+-- TODO CARACTERÍSTICAS: ajustar jacuzzi / has_tv / has_swing por sala antes de
+-- aplicar. Valores de abajo = plantilla conservadora.
+-- allows_overnight = true en las 3: admiten noche completa y el personal la
+-- activa/desactiva con el toggle del admin (_app.rooms.tsx). Requiere que el
+-- bloque 4 (rate_overnight 10:00) tenga precio, o la base saldrá 0 €.
+-- insert into rooms (building, name, jacuzzi, capacity, rate_group_id, has_tv, has_swing, allows_overnight, active)
+-- select v.building, v.name, v.jacuzzi::jacuzzi_option, v.capacity,
+--        (select id from rate_groups where name = v.rate_group_name),
+--        v.has_tv, v.has_swing, v.allows_overnight, true
+-- from (values
+--   -- building , name          , jacuzzi   , cap, rate_group_name, has_tv, has_swing, allows_overnight
+--   ('ventas', 'Miami'      , 'optional', 2, 'Miami'      , false, false, true),
+--   ('ventas', 'Bali Deluxe', 'optional', 2, 'Bali Deluxe', false, false, true),
+--   ('ventas', 'Cairo'      , 'optional', 2, 'Cairo'      , false, false, true)
+-- ) as v(building, name, jacuzzi, capacity, rate_group_name, has_tv, has_swing, allows_overnight)
+-- on conflict (building, name) do nothing;
+
+-- ─── 3) Tarifas por horas (TODO PRECIO: rellenar con la hoja de tarifas) ──────
+-- Duraciones en minutos. with_j = con jacuzzi, without_j = sin jacuzzi.
+-- with
+--   g as (
+--     select id, name from rate_groups where name in ('Miami', 'Bali Deluxe', 'Cairo')
+--   ),
+--   hourly(rate_group_name, duration_min, with_j, without_j) as (
+--     values
+--       -- TODO PRECIO Miami
+--       ('Miami', 60,  null, null),
+--       ('Miami', 90,  null, null),
+--       ('Miami', 120, null, null),
+--       ('Miami', 150, null, null),
+--       ('Miami', 180, null, null),
+--       ('Miami', 210, null, null),
+--       ('Miami', 240, null, null),
+--       ('Miami', 270, null, null),
+--       ('Miami', 300, null, null),
+--       ('Miami', 330, null, null),
+--       ('Miami', 360, null, null),
+--       -- TODO PRECIO Bali Deluxe
+--       ('Bali Deluxe', 60,  null, null),
+--       ('Bali Deluxe', 90,  null, null),
+--       ('Bali Deluxe', 120, null, null),
+--       ('Bali Deluxe', 150, null, null),
+--       ('Bali Deluxe', 180, null, null),
+--       ('Bali Deluxe', 210, null, null),
+--       ('Bali Deluxe', 240, null, null),
+--       ('Bali Deluxe', 270, null, null),
+--       ('Bali Deluxe', 300, null, null),
+--       ('Bali Deluxe', 330, null, null),
+--       ('Bali Deluxe', 360, null, null),
+--       -- TODO PRECIO Cairo
+--       ('Cairo', 60,  null, null),
+--       ('Cairo', 90,  null, null),
+--       ('Cairo', 120, null, null),
+--       ('Cairo', 150, null, null),
+--       ('Cairo', 180, null, null),
+--       ('Cairo', 210, null, null),
+--       ('Cairo', 240, null, null),
+--       ('Cairo', 270, null, null),
+--       ('Cairo', 300, null, null),
+--       ('Cairo', 330, null, null),
+--       ('Cairo', 360, null, null)
+--   )
+-- insert into rate_hourly (rate_group_id, duration_min, price_with_jacuzzi, price_without_jacuzzi)
+-- select g.id, h.duration_min, h.with_j, h.without_j
+-- from hourly h
+-- join g on g.name = h.rate_group_name
+-- on conflict (rate_group_id, duration_min)
+-- do update set
+--   price_with_jacuzzi = excluded.price_with_jacuzzi,
+--   price_without_jacuzzi = excluded.price_without_jacuzzi;
+
+-- ─── 4) Tarifas de noche completa (las 3 salas: allows_overnight = true) ──────
+-- OBLIGATORIO rellenar el precio de la fila 10:00 de cada sala: pricing.ts usa
+-- exclusivamente el checkout de las 10:00; si falta o va en null, la base de
+-- noche completa sale a 0 €. Añadir 11:00 / 12:00 si se ofrecen salidas tardías.
+-- with
+--   g as (
+--     select id, name from rate_groups where name in ('Miami', 'Bali Deluxe', 'Cairo')
+--   ),
+--   overnight(rate_group_name, checkout_time, price) as (
+--     values
+--       -- TODO PRECIO noche completa (una fila 10:00 como mínimo por sala)
+--       ('Miami',       '10:00:00'::time, null),
+--       ('Bali Deluxe', '10:00:00'::time, null),
+--       ('Cairo',       '10:00:00'::time, null)
+--   )
+-- insert into rate_overnight (rate_group_id, checkout_time, price)
+-- select g.id, o.checkout_time, o.price
+-- from overnight o
+-- join g on g.name = o.rate_group_name
+-- on conflict (rate_group_id, checkout_time)
+-- do update set price = excluded.price;
+
+-- commit;

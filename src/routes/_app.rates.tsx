@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -15,7 +16,47 @@ import { useRateGroups, useDynamicRules, eur, DURATION_LABELS } from "@/lib/data
 import { useRoles } from "@/lib/roles";
 import { Navigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+
+type DynamicRuleFormType = "occupancy" | "date";
+type DynamicRuleConfig = {
+  threshold?: number;
+  from?: string;
+  to?: string;
+  weekdays?: number[];
+  timeFrom?: string;
+  timeTo?: string;
+  windows?: { weekday: number; from: string; to: string }[];
+};
+
+const WEEKDAYS = [
+  { value: 1, label: "L" },
+  { value: 2, label: "M" },
+  { value: 3, label: "X" },
+  { value: 4, label: "J" },
+  { value: 5, label: "V" },
+  { value: 6, label: "S" },
+  { value: 0, label: "D" },
+];
+
+function describeDateRuleConfig(cfg: DynamicRuleConfig) {
+  if (cfg.windows?.length) {
+    return cfg.windows.map((w) => {
+      const day = WEEKDAYS.find((d) => d.value === w.weekday)?.label ?? String(w.weekday);
+      return `${day} ${w.from}-${w.to}`;
+    }).join(", ");
+  }
+  const parts: string[] = [];
+  if (cfg.from || cfg.to) parts.push(`${cfg.from || "..."} -> ${cfg.to || "..."}`);
+  if (cfg.weekdays?.length) {
+    parts.push(cfg.weekdays.map((w) => WEEKDAYS.find((d) => d.value === w)?.label ?? String(w)).join(","));
+  }
+  const from = cfg.timeFrom ?? "00:00";
+  const to = cfg.timeTo ?? "24:00";
+  if (from !== "00:00" || to !== "24:00") parts.push(`${from}-${to}`);
+  else parts.push("Todo el dia");
+  return parts.join(" · ");
+}
 
 export const Route = createFileRoute("/_app/rates")({
   component: RatesPage,
@@ -202,26 +243,110 @@ function ThirdPersonTable() {
   );
 }
 
+// "weekday" is a UI-only form mode that saves as type="date" without date range
+type FormType = "occupancy" | "date" | "weekday";
+
+function badgeLabel(r: { type: string; config: unknown }) {
+  if (r.type === "occupancy") return "Ocupación";
+  const cfg = r.config as DynamicRuleConfig;
+  if (!cfg.from && !cfg.to && cfg.weekdays?.length) return "Semanal";
+  return "Fecha";
+}
+
 function DynamicRulesPanel() {
   const qc = useQueryClient();
   const { data } = useDynamicRules();
   const [open, setOpen] = useState(false);
-  const [type, setType] = useState<"occupancy" | "date">("occupancy");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [formType, setFormType] = useState<FormType>("occupancy");
   const [name, setName] = useState("");
   const [multiplier, setMultiplier] = useState(15);
   const [threshold, setThreshold] = useState(70);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const [timeFrom, setTimeFrom] = useState("00:00");
+  const [timeTo, setTimeTo] = useState("24:00");
+
+  function resetForm() {
+    setEditId(null);
+    setFormType("occupancy");
+    setName("");
+    setMultiplier(15);
+    setThreshold(70);
+    setFrom("");
+    setTo("");
+    setWeekdays([]);
+    setTimeFrom("00:00");
+    setTimeTo("24:00");
+  }
+
+  function openEdit(r: { id: string; type: string; name: string; multiplier: number; config: unknown }) {
+    const cfg = r.config as DynamicRuleConfig;
+    setEditId(r.id);
+    setName(r.name);
+    setMultiplier(r.multiplier);
+    setThreshold(cfg.threshold ?? 70);
+    setFrom(cfg.from ?? "");
+    setTo(cfg.to ?? "");
+    setWeekdays(cfg.weekdays ?? []);
+    setTimeFrom(cfg.timeFrom ?? "00:00");
+    setTimeTo(cfg.timeTo ?? "24:00");
+    if (r.type === "occupancy") {
+      setFormType("occupancy");
+    } else if (!cfg.from && !cfg.to && cfg.weekdays?.length) {
+      setFormType("weekday");
+    } else {
+      setFormType("date");
+    }
+    setOpen(true);
+  }
+
+  function buildConfig(): DynamicRuleConfig {
+    if (formType === "occupancy") return { threshold };
+    if (formType === "weekday") {
+      return { weekdays, timeFrom, timeTo };
+    }
+    return {
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(weekdays.length ? { weekdays } : {}),
+      timeFrom,
+      timeTo,
+    };
+  }
+
+  const dbType = formType === "occupancy" ? "occupancy" : "date";
 
   const create = useMutation({
     mutationFn: async () => {
-      const config = type === "occupancy" ? { threshold } : { from, to };
       const { error } = await supabase.from("dynamic_rules").insert({
-        type, name, multiplier, config: config as never, active: true,
+        type: dbType, name, multiplier, config: buildConfig() as never, active: true,
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["dynamic_rules"] }); setOpen(false); toast.success("Regla creada"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dynamic_rules"] });
+      setOpen(false);
+      resetForm();
+      toast.success("Regla creada");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const update = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("dynamic_rules")
+        .update({ type: dbType, name, multiplier, config: buildConfig() as never })
+        .eq("id", editId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dynamic_rules"] });
+      setOpen(false);
+      resetForm();
+      toast.success("Regla guardada");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -240,29 +365,92 @@ function DynamicRulesPanel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dynamic_rules"] }),
   });
 
+  const WeekdayPicker = () => (
+    <div className="flex flex-wrap gap-3">
+      {WEEKDAYS.map((day) => (
+        <label key={day.value} className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={weekdays.includes(day.value)}
+            onCheckedChange={(checked) => {
+              setWeekdays((current) =>
+                checked
+                  ? Array.from(new Set([...current, day.value]))
+                  : current.filter((value) => value !== day.value),
+              );
+            }}
+          />
+          {day.label}
+        </label>
+      ))}
+    </div>
+  );
+
+  const timeFromOptions = Array.from({ length: 24 * 4 }, (_, i) => {
+    const hh = String(Math.floor(i / 4)).padStart(2, "0");
+    const mm = String((i % 4) * 15).padStart(2, "0");
+    return `${hh}:${mm}`;
+  });
+  const timeToOptions = [
+    ...Array.from({ length: 24 * 4 - 1 }, (_, i) => {
+      const total = (i + 1) * 15;
+      const hh = String(Math.floor(total / 60)).padStart(2, "0");
+      const mm = String(total % 60).padStart(2, "0");
+      return `${hh}:${mm}`;
+    }),
+    "24:00",
+  ];
+
+  const TimePicker = () => (
+    <div className="space-y-1.5">
+      <Label>Tramo horario</Label>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Desde</Label>
+          <Select value={timeFrom} onValueChange={setTimeFrom}>
+            <SelectTrigger><SelectValue placeholder="00:00" /></SelectTrigger>
+            <SelectContent className="max-h-[40vh]">
+              {timeFromOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Hasta</Label>
+          <Select value={timeTo} onValueChange={setTimeTo}>
+            <SelectTrigger><SelectValue placeholder="24:00" /></SelectTrigger>
+            <SelectContent className="max-h-[40vh]">
+              {timeToOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">Todo el día: desde 00:00 hasta 24:00.</p>
+    </div>
+  );
+
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
           Las reglas se aplican sobre la tarifa base + suplementos. Las de fecha y ocupación se acumulan.
         </p>
-        <Button onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" /> Nueva regla</Button>
+        <Button onClick={() => { resetForm(); setOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Nueva regla</Button>
       </div>
 
       <div className="grid gap-2">
         {data?.map((r) => {
-          const cfg = r.config as { threshold?: number; from?: string; to?: string };
+          const cfg = r.config as DynamicRuleConfig;
           return (
             <Card key={r.id}>
               <CardContent className="p-3 flex items-center gap-3 flex-wrap">
-                <Badge variant="outline">{r.type === "occupancy" ? "Ocupación" : "Fecha"}</Badge>
+                <Badge variant="outline">{badgeLabel(r)}</Badge>
                 <div className="font-medium">{r.name}</div>
                 <div className="text-sm text-muted-foreground">
-                  {r.type === "occupancy" ? `≥ ${cfg.threshold}% ocupación` : `${cfg.from} → ${cfg.to}`}
+                  {r.type === "occupancy" ? `>= ${cfg.threshold}% ocupacion` : describeDateRuleConfig(cfg)}
                 </div>
                 <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">+{r.multiplier}%</div>
                 <div className="ml-auto flex items-center gap-2">
                   <Switch checked={r.active} onCheckedChange={(active) => toggle.mutate({ id: r.id, active })} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove.mutate(r.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </CardContent>
@@ -272,34 +460,59 @@ function DynamicRulesPanel() {
         {!data?.length && <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Sin reglas. Crea la primera.</CardContent></Card>}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); setOpen(v); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nueva regla dinámica</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? "Editar regla dinámica" : "Nueva regla dinámica"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Select value={type} onValueChange={(v) => setType(v as "occupancy" | "date")}>
+              <Select value={formType} onValueChange={(v) => setFormType(v as FormType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="occupancy">Por ocupación</SelectItem>
-                  <SelectItem value="date">Por fecha</SelectItem>
+                  <SelectItem value="weekday">Por día de la semana (indefinido)</SelectItem>
+                  <SelectItem value="date">Por rango de fechas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Nombre</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. San Valentín, Alta ocupación" /></div>
+            <div className="space-y-1.5"><Label>Nombre</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Fin de semana, San Valentín" /></div>
             <div className="space-y-1.5"><Label>Recargo (%)</Label><Input type="number" value={multiplier} onChange={(e) => setMultiplier(Number(e.target.value))} /></div>
-            {type === "occupancy" ? (
+
+            {formType === "occupancy" && (
               <div className="space-y-1.5"><Label>Umbral de ocupación (%)</Label><Input type="number" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} /></div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1.5"><Label>Desde</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-                <div className="space-y-1.5"><Label>Hasta</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+            )}
+
+            {formType === "weekday" && (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Días de la semana</Label>
+                  <WeekdayPicker />
+                  <p className="text-xs text-muted-foreground">La regla se activa cada semana en los días marcados, sin fecha de expiración.</p>
+                </div>
+                <TimePicker />
+              </div>
+            )}
+
+            {formType === "date" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5"><Label>Desde (opcional)</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label>Hasta (opcional)</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Días de la semana (opcional)</Label>
+                  <WeekdayPicker />
+                  <p className="text-xs text-muted-foreground">Sin selección se aplica todos los días del rango.</p>
+                </div>
+                <TimePicker />
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => create.mutate()} disabled={!name}>Crear</Button>
+            <Button variant="outline" onClick={() => { resetForm(); setOpen(false); }}>Cancelar</Button>
+            <Button onClick={() => editId ? update.mutate() : create.mutate()} disabled={!name}>
+              {editId ? "Guardar" : "Crear"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

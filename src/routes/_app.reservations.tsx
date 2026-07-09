@@ -181,7 +181,7 @@ function ReservationsPage() {
                         )}
                       </td>
                       <td className="p-2 text-right">
-                        {r.status !== "cancelled" && r.status !== "rejected" && r.status !== "completed" && (
+                        {r.status !== "cancelled" && r.status !== "completed" && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setCancelReason(""); setCancelTarget(r.id); }} title="Cancelar">
                             <X className="h-4 w-4" />
                           </Button>

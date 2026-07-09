@@ -6,7 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,8 +21,21 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon,
-  ShieldCheck, CheckCircle2, CreditCard, Plus, Minus, Gift,
-  Phone, ChevronRight, Tv, Moon, Clock, Star, Flame, MapPin, Globe, MessageCircle,
+  ShieldCheck,
+  CheckCircle2,
+  CreditCard,
+  Plus,
+  Minus,
+  Gift,
+  Phone,
+  ChevronRight,
+  Tv,
+  Moon,
+  Clock,
+  Star,
+  Flame,
+  MapPin,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { calculatePrice, round2, type PriceBreakdown } from "@/lib/pricing";
@@ -26,17 +45,29 @@ import { roomForSlug } from "@/lib/roomSlugs";
 
 import { DecorationCarousel } from "@/components/DecorationCarousel";
 import { RoomImageCarousel } from "@/components/RoomImageCarousel";
+import { PublicAnalytics } from "@/components/PublicAnalytics";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
+import { CookieConsent } from "@/components/CookieConsent";
 
 // Map to dynamically resolve room images from /public/imagenes. Each room can
 // list several photos that are shown in a manual carousel (no autoscroll). Only
 // photos whose name matches the room are listed here.
 const ROOM_IMAGES_MAP: Record<string, Record<string, string[]>> = {
   bernabeu: {
-    "Grey": ["/imagenes/Bernabeu/Grey/greybernabeu.jpeg"],
-    "Ocean": ["/imagenes/Bernabeu/Ocean/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-ocean-1.webp"],
-    "Paris": ["/imagenes/Bernabeu/Paris/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-paris-4.webp"],
-    "Safari": ["/imagenes/Bernabeu/Safari/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-safari-4.webp"],
-    "Tokyo": ["/imagenes/Bernabeu/Tokio/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-tokio-1.webp"],
+    Grey: ["/imagenes/Bernabeu/Grey/greybernabeu.jpeg"],
+    Ocean: [
+      "/imagenes/Bernabeu/Ocean/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-ocean-1.webp",
+    ],
+    Paris: [
+      "/imagenes/Bernabeu/Paris/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-paris-4.webp",
+    ],
+    Safari: [
+      "/imagenes/Bernabeu/Safari/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-safari-4.webp",
+    ],
+    Tokyo: [
+      "/imagenes/Bernabeu/Tokio/habitaciones-por-horas-hotel-romantico-madrid-bernabeu-tokio-1.webp",
+    ],
   },
   ventas: {
     "Empire State": [
@@ -45,17 +76,26 @@ const ROOM_IMAGES_MAP: Record<string, Record<string, string[]>> = {
       "/imagenes/Ventas/Empire State/Empire_2.jpeg",
       "/imagenes/Ventas/Empire State/Empire_jacuzzi.jpeg",
     ],
-    "Grey": ["/imagenes/Ventas/Grey/habitacion-romantica-hotel-madrid-ventas-grey-1-ver.webp"],
-    "Hollywood": [
-      "/imagenes/Ventas/Hollywood/habitacion-romantica-hotel-madrid-ventas-hollywood.webp",
+    Grey: [
+      "/imagenes/Ventas/Grey/01.PNG",
+      "/imagenes/Ventas/Grey/02.PNG",
+      "/imagenes/Ventas/Grey/03.PNG",
+      "/imagenes/Ventas/Grey/05.PNG",
+      "/imagenes/Ventas/Grey/06.PNG",
+      "/imagenes/Ventas/Grey/07.PNG",
+      "/imagenes/Ventas/Grey/08.PNG",
+      "/imagenes/Ventas/Grey/09.PNG",
+      "/imagenes/Ventas/Grey/10.jpg",
+      "/imagenes/Ventas/Grey/11.PNG",
+      "/imagenes/Ventas/Grey/12.PNG",
+    ],
+    Hollywood: [
       "/imagenes/Ventas/Hollywood/Hollywood_1.jpeg",
       "/imagenes/Ventas/Hollywood/Hollywood_2.jpeg",
       "/imagenes/Ventas/Hollywood/Hollywood_3.jpeg",
       "/imagenes/Ventas/Hollywood/Hollywood_4.jpeg",
     ],
-    "Music": [
-      "/imagenes/Ventas/Music/habitacion-romantica-hotel-madrid-ventas-music-2.webp",
-      "/imagenes/Ventas/Music/habitacion-romantica-hotel-madrid-ventas-music-5.webp",
+    Music: [
       "/imagenes/Ventas/Music/15A1DD58-967F-44AF-9389-2999746452E1.png",
       "/imagenes/Ventas/Music/1605D0D3-DC30-4DE8-AF92-41D334E9FB1F.png",
       "/imagenes/Ventas/Music/2B9E4E98-28E7-4E62-862A-2CE1C4D0C857.png",
@@ -74,13 +114,33 @@ const ROOM_IMAGES_MAP: Record<string, Record<string, string[]>> = {
       "/imagenes/Ventas/Route 66/JacuzziRuta66.jpeg",
       "/imagenes/Ventas/Route 66/Ruta66_tantra.jpeg",
     ],
+    // ───────────────────────────────────────────────────────────────
+    // TODO (habitaciones nuevas RM Ventas): descomentar cuando estén
+    // disponibles y subir las fotos reales a /public/imagenes/Ventas/<Sala>/.
+    // Las rutas de abajo son marcadores de posición: sustituir por los
+    // nombres de archivo reales. Sin fotos, la habitación cae al
+    // ROOM_IMAGE_FALLBACK genérico (ver getRoomImages).
+    // "Miami": [
+    //   "/imagenes/Ventas/Miami/miami-1.jpeg",
+    // ],
+    // "Bali Deluxe": [
+    //   "/imagenes/Ventas/Bali Deluxe/bali-deluxe-1.jpeg",
+    // ],
+    // "Cairo": [
+    //   "/imagenes/Ventas/Cairo/cairo-1.jpeg",
+    // ],
+    // ───────────────────────────────────────────────────────────────
   },
   america: {
-    "Dubai": ["/imagenes/America/Dubai/Dubainueva.jpeg"],
-    "Grey": ["/imagenes/America/Grey/grey-america-03.jpg"],
-    "Maldivas": ["/imagenes/America/Maldivas/maldivas-03--hoteles-para-parejas-baratos.webp"],
-    "New York": ["/imagenes/America/New York/nueva-york-04--reservar-habitaciones-por-horas-en-madrid.webp"],
-    "Tu y yo": ["/imagenes/America/Tu y yo/tu-y-yo-galeria-05--hoteles-para-parejas-en-madrid.webp"],
+    Dubai: ["/imagenes/America/Dubai/Dubainueva.jpeg"],
+    Grey: ["/imagenes/America/Grey/grey-america-03.jpg"],
+    Maldivas: ["/imagenes/America/Maldivas/maldivas-03--hoteles-para-parejas-baratos.webp"],
+    "New York": [
+      "/imagenes/America/New York/nueva-york-04--reservar-habitaciones-por-horas-en-madrid.webp",
+    ],
+    "Tu y yo": [
+      "/imagenes/America/Tu y yo/tu-y-yo-galeria-05--hoteles-para-parejas-en-madrid.webp",
+    ],
   },
 };
 
@@ -89,7 +149,11 @@ export const Route = createFileRoute("/reservar")({
   head: () => ({
     meta: [
       { title: "Reserva · Rooms Madrid" },
-      { name: "description", content: "Habitaciones temáticas con jacuzzi en el centro de Madrid. Reserva online en 2 minutos. Solo +18." },
+      {
+        name: "description",
+        content:
+          "Habitaciones temáticas con jacuzzi en el centro de Madrid. Reserva online en 2 minutos. Solo +18.",
+      },
     ],
   }),
 });
@@ -140,22 +204,28 @@ function getRoomImage(r: { name: string; building: string }) {
 const ROOM_DESCRIPTIONS: Record<string, Record<string, string>> = {
   ventas: {
     "Empire State": "La ciudad que nunca duerme a vuestros pies… y vosotros tampoco.",
-    "Grey": "Luces rojas y rincones de seducción para liberar la imaginación.",
-    "Hollywood": "Sed los protagonistas de vuestra propia película sin censura.",
-    "Music": "Luces de fiesta, ritmo y burbujas para subir el volumen de la pasión.",
+    Grey: "Luces rojas y rincones de seducción para liberar la imaginación.",
+    Hollywood: "Sed los protagonistas de vuestra propia película sin censura.",
+    Music: "Luces de fiesta, ritmo y burbujas para subir el volumen de la pasión.",
     "Route 66": "Una escapada salvaje por la ruta del deseo bajo un cielo de fuego.",
+    // TODO (habitaciones nuevas RM Ventas): descomentar al lanzarlas y
+    // ajustar el copy sugerente. Sin entrada aquí, getRoomDescription usa
+    // un texto genérico ("Habitación temática para N personas.").
+    // "Miami": "Brisa de neón, palmeras y noche eterna: bienvenidos a Miami.",
+    // "Bali Deluxe": "Un templo del placer entre seda, orquídeas y agua tibia.",
+    // "Cairo": "Misterio milenario y lujo dorado para una noche de faraones.",
   },
   bernabeu: {
-    "Grey": "Penumbra, neón y juego: dejaos llevar sin reglas.",
-    "Ocean": "Sumergíos en las profundidades de una noche azul e infinita.",
-    "Paris": "La ciudad del amor enciende los sentidos al caer la tarde.",
-    "Safari": "Despertad vuestro lado más salvaje en plena sabana.",
-    "Tokyo": "Neón, pétalos y noche eléctrica: un Tokio hecho para dos.",
+    Grey: "Penumbra, neón y juego: dejaos llevar sin reglas.",
+    Ocean: "Sumergíos en las profundidades de una noche azul e infinita.",
+    Paris: "La ciudad del amor enciende los sentidos al caer la tarde.",
+    Safari: "Despertad vuestro lado más salvaje en plena sabana.",
+    Tokyo: "Neón, pétalos y noche eléctrica: un Tokio hecho para dos.",
   },
   america: {
-    "Grey": "Cuero, neón rojo y penumbra: el escenario para perder el control.",
-    "Dubai": "Lujo de oro negro, champán y pétalos para una noche sin límites.",
-    "Maldivas": "Una isla privada donde el tiempo se detiene y solo existís vosotros.",
+    Grey: "Cuero, neón rojo y penumbra: el escenario para perder el control.",
+    Dubai: "Lujo de oro negro, champán y pétalos para una noche sin límites.",
+    Maldivas: "Una isla privada donde el tiempo se detiene y solo existís vosotros.",
     "New York": "Bajo las luces de Manhattan, una noche de cine para dos.",
     "Tu y yo": "Solo vosotros, sin testigos: intimidad en estado puro.",
   },
@@ -170,16 +240,72 @@ function getRoomDescription(r: { name: string; building: string; capacity: numbe
   return `Habitación temática para ${r.capacity} personas.`;
 }
 
-// Rooms that feature a screen. Shown as a single "Pantalla disponible" badge —
-// the previous capacity/jacuzzi badges were redundant and have been removed.
+// Rooms that feature a screen. Shown as a single "Pantalla disponible" badge.
+// TODO (habitaciones nuevas RM Ventas): cuando se definan las prestaciones de
+// Miami / Bali Deluxe / Cairo, añadir aquí las que tengan PANTALLA. Ejemplo:
+//   ventas: ["Music", "Grey", "Miami", "Cairo"],
 const ROOMS_WITH_SCREEN: Record<string, string[]> = {
   america: ["Dubai", "New York"],
-  ventas: ["Route 66", "Grey", "Music"],
-  bernabeu: ["Grey", "Safari"],
+  ventas: ["Music", "Grey"],
+  bernabeu: ["Safari"],
+};
+
+// TODO (habitaciones nuevas RM Ventas): añadir aquí las que tengan CUBO LED.
+// Ejemplo: ventas: ["Route 66", "Bali Deluxe"],
+const ROOMS_WITH_LED_CUBE: Record<string, string[]> = {
+  ventas: ["Route 66"],
+  bernabeu: ["Grey"],
+};
+
+// TODO (habitaciones nuevas RM Ventas): añadir aquí las que admitan COLUMPIO.
+// Debe ir en línea con el flag `rooms.has_swing` de la BD. Ejemplo:
+//   ventas: ["Hollywood", "Empire State", "Music", "Grey", "Bali Deluxe"],
+const ROOMS_WITH_SWING_EXTRA: Record<string, string[]> = {
+  america: ["Dubai", "Grey", "Tu y yo"],
+  ventas: ["Hollywood", "Empire State", "Music", "Grey"],
+  bernabeu: ["Tokyo", "Paris", "Grey"],
 };
 
 function hasScreen(r: { name: string; building: string }): boolean {
   return ROOMS_WITH_SCREEN[buildingKey(r.building)]?.includes(r.name) ?? false;
+}
+
+function hasLedCube(r: { name: string; building: string }): boolean {
+  return ROOMS_WITH_LED_CUBE[buildingKey(r.building)]?.includes(r.name) ?? false;
+}
+
+function allowsSwingExtra(r: { name: string; building: string }): boolean {
+  return ROOMS_WITH_SWING_EXTRA[buildingKey(r.building)]?.includes(r.name) ?? false;
+}
+
+function isSwingExtra(ex: ExtraLite): boolean {
+  return /colump/i.test(ex.name);
+}
+
+function swingExtraMatchesMode(ex: ExtraLite, overnight: boolean): boolean {
+  if (!isSwingExtra(ex)) return true;
+  return overnight ? /noche/i.test(ex.name) : /hora/i.test(ex.name);
+}
+
+function displayExtraName(ex: ExtraLite): string {
+  if (!isSwingExtra(ex)) return ex.name;
+  return ex.name.replace(/\s*\((por horas|noche completa)\)/i, "").trim();
+}
+
+function isLedCubeExtra(ex: ExtraLite): boolean {
+  return /cubo/i.test(ex.name) && /led/i.test(ex.name);
+}
+
+function extraAvailableForRoom(ex: ExtraLite, r: { name: string; building: string }): boolean {
+  if (isSwingExtra(ex)) return allowsSwingExtra(r);
+  if (isLedCubeExtra(ex)) return hasLedCube(r);
+  return true;
+}
+
+function messageSurfaceLabel(r: { name: string; building: string }) {
+  if (hasLedCube(r)) return "Mensaje en el cubo LED";
+  if (hasScreen(r)) return "Mensaje en la pantalla";
+  return "Mensaje en el cristal";
 }
 
 // Real uploaded decoration photos shown in an auto-advancing carousel on every
@@ -272,11 +398,14 @@ const BUILDINGS: { value: string; label: string; address: string }[] = [
   },
 ];
 
-const CONTACTS: Record<string, { phones: { number: string; href: string }[]; email: string; address: string }> = {
+const CONTACTS: Record<
+  string,
+  { phones: { number: string; href: string }[]; email: string; address: string }
+> = {
   bernabeu: {
     phones: [
-      { number: "91 007 61 00", href: "tel:+34910076100" },
-      { number: "685 066 656",  href: "tel:+34685066656" },
+      { number: "910 076 100", href: "tel:+34910076100" },
+      { number: "685 066 656", href: "tel:+34685066656" },
     ],
     email: "reservas@roomsmadrid.es",
     address: "Calle Infanta Mercedes, 9 · CP 28020 Madrid",
@@ -284,7 +413,7 @@ const CONTACTS: Record<string, { phones: { number: string; href: string }[]; ema
   ventas: {
     phones: [
       { number: "91 060 34 81", href: "tel:+34910603481" },
-      { number: "657 992 990",  href: "tel:+34657992990" },
+      { number: "657 992 990", href: "tel:+34657992990" },
     ],
     email: "reservas@roomsmadrid.es",
     address: "Madrid",
@@ -304,8 +433,8 @@ const CONTACTS: Record<string, { phones: { number: string; href: string }[]; ema
 // chat with the reservation details prefilled so reception confirms manually.
 const WHATSAPP_NUMBERS: Record<string, { display: string; intl: string }> = {
   bernabeu: { display: "605 472 600", intl: "34605472600" },
-  ventas:   { display: "685 066 656", intl: "34685066656" },
-  america:  { display: "657 992 990", intl: "34657992990" },
+  ventas: { display: "685 066 656", intl: "34685066656" },
+  america: { display: "657 992 990", intl: "34657992990" },
 };
 
 // ─────────────────────────────────────────────
@@ -513,23 +642,37 @@ const CSS = `
     display: flex; align-items: center; justify-content: center; gap: 8px;
     font-family: 'Noto Sans', sans-serif;
   }
-  .rm-btn-primary:hover { background: var(--blood-dark); color: #fff; box-shadow: 0 6px 22px rgba(115,20,35,0.28); }
+  .rm-btn-primary:hover { background: linear-gradient(180deg, var(--blood) 0%, var(--blood-dark) 100%); color: #fff; box-shadow: 0 6px 22px rgba(115,20,35,0.28); }
 
   .rm-trust {
     display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 12px; max-width: 720px; margin: 0 auto;
+    gap: 14px; max-width: 760px; margin: 0 auto;
   }
   @media (max-width: 520px) { .rm-trust { grid-template-columns: 1fr; } }
   .rm-trust-item {
+    display: flex; align-items: center; gap: 14px;
     background: var(--warm-white);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
+    border-top: 2px solid var(--blood);
+    border-radius: 4px;
+    padding: 18px 20px;
+    text-align: left;
   }
-  .rm-trust-icon { font-size: 22px; margin-bottom: 8px; }
-  .rm-trust-title { font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
-  .rm-trust-sub { font-size: 12px; color: var(--ink-soft); }
+  .rm-trust-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: rgba(115,20,35,0.07);
+    border: 1px solid rgba(115,20,35,0.22);
+    color: var(--blood);
+  }
+  .rm-trust-title {
+    font-family: 'Playfair', Georgia, serif;
+    font-size: 17px; font-weight: 600; color: var(--ink);
+    line-height: 1.2; margin-bottom: 2px;
+  }
+  .rm-trust-sub { font-size: 12.5px; color: var(--ink-soft); }
 
   /* ── ROOMS STEP ── */
   .rm-section-header { margin-bottom: 28px; }
@@ -619,7 +762,7 @@ const CSS = `
     font-family: 'Noto Sans', sans-serif;
     white-space: nowrap;
   }
-  .rm-btn-select:hover { background: var(--blood-dark); color: #fff; box-shadow: 0 6px 18px rgba(115,20,35,0.26); }
+  .rm-btn-select:hover { background: linear-gradient(180deg, var(--blood) 0%, var(--blood-dark) 100%); color: #fff; box-shadow: 0 6px 18px rgba(115,20,35,0.26); }
 
   /* Extras dentro de la habitación */
   .rm-room-extras {
@@ -654,7 +797,7 @@ const CSS = `
     cursor: pointer;
     background: var(--warm-white);
   }
-  .rm-extra-item.selected { border-color: var(--gold); background: rgba(115,20,35,0.05); }
+  .rm-extra-item.selected { border-color: rgba(115,20,35,0.35); background: rgba(115,20,35,0.03); box-shadow: 0 0 0 1px rgba(115,20,35,0.12); }
   .rm-extra-img { width: 100%; height: 90px; object-fit: cover; display: block; }
   .rm-extra-body { padding: 10px 12px; }
   .rm-extra-name { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 2px; line-height: 1.3; }
@@ -810,7 +953,7 @@ const CSS = `
     font-family: 'Noto Sans', sans-serif;
     margin-top: 20px;
   }
-  .rm-btn-continue:hover { background: var(--blood-dark); color: #fff; box-shadow: 0 6px 22px rgba(115,20,35,0.28); }
+  .rm-btn-continue:hover { background: linear-gradient(180deg, var(--blood) 0%, var(--blood-dark) 100%); color: #fff; box-shadow: 0 6px 22px rgba(115,20,35,0.28); }
   .rm-btn-continue:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Building select */
@@ -985,7 +1128,10 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
   const handlingPop = useRef(false);
   const payingGuard = useRef(false);
 
-  const startAt = useMemo(() => (date && time ? new Date(`${date}T${time}:00`) : null), [date, time]);
+  const startAt = useMemo(
+    () => (date && time ? new Date(`${date}T${time}:00`) : null),
+    [date, time],
+  );
   // Overnight requires both an eligible entry day and a room that allows it.
   const roomAllowsOvernight = room?.allows_overnight !== false;
   const dayAllowsOvernight = startAt ? isOvernightAllowed(startAt) : false;
@@ -1006,8 +1152,12 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
   const endAt = useMemo(() => {
     if (!startAt) return null;
     const e = new Date(startAt);
-    if (isOvernight) { e.setDate(e.getDate() + 1); e.setHours(10, 0, 0, 0); }
-    else { e.setMinutes(e.getMinutes() + duration); }
+    if (isOvernight) {
+      e.setDate(e.getDate() + 1);
+      e.setHours(10, 0, 0, 0);
+    } else {
+      e.setMinutes(e.getMinutes() + duration);
+    }
     return e;
   }, [startAt, isOvernight, duration]);
 
@@ -1020,8 +1170,12 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     queryKey: ["public-rooms"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("rooms").select("id,name,building,capacity,jacuzzi,has_tv,has_swing,rate_group_id,allows_overnight,status")
-        .eq("active", true).order("sort_order");
+        .from("rooms")
+        .select(
+          "id,name,building,capacity,jacuzzi,has_tv,has_swing,rate_group_id,allows_overnight,status",
+        )
+        .eq("active", true)
+        .order("sort_order");
       if (error) throw error;
       return data as RoomLite[];
     },
@@ -1040,10 +1194,12 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     queryKey: ["public-extras"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("extras").select("id,name,description,price,category")
-        .eq("active", true).order("sort_order");
+        .from("extras")
+        .select("id,name,description,price,category")
+        .eq("active", true)
+        .order("sort_order");
       if (error) throw error;
-      return (data as ExtraLite[]).filter(e => e.category !== "services" && Number(e.price) > 0);
+      return (data as ExtraLite[]).filter((e) => e.category !== "services" && Number(e.price) > 0);
     },
   });
 
@@ -1051,8 +1207,15 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     const map = new Map<string, number>();
     if (!rooms || !rateHourly) return map;
     const cheapestByGroup = new Map<string, number>();
-    for (const r of rateHourly as { rate_group_id: string; price_without_jacuzzi: number | null; price_with_jacuzzi: number | null }[]) {
-      const candidates = [Number(r.price_without_jacuzzi ?? Infinity), Number(r.price_with_jacuzzi ?? Infinity)].filter(n => Number.isFinite(n));
+    for (const r of rateHourly as {
+      rate_group_id: string;
+      price_without_jacuzzi: number | null;
+      price_with_jacuzzi: number | null;
+    }[]) {
+      const candidates = [
+        Number(r.price_without_jacuzzi ?? Infinity),
+        Number(r.price_with_jacuzzi ?? Infinity),
+      ].filter((n) => Number.isFinite(n));
       if (!candidates.length) continue;
       const best = Math.min(...candidates);
       const cur = cheapestByGroup.get(r.rate_group_id);
@@ -1079,7 +1242,8 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       const NEW_CLEANING_MIN = 15; // public bookings use the default buffer
       const sixtyMinutesAgo = Date.now() - 60 * 60_000;
       const { data, error } = await supabase
-        .from("reservations").select("room_id,status,created_at,start_at,end_at,cleaning_minutes")
+        .from("reservations")
+        .select("room_id,status,created_at,start_at,end_at,cleaning_minutes")
         .gte("end_at", new Date(startAt.getTime() - WINDOW_MS).toISOString())
         .lte("start_at", new Date(endAt.getTime() + WINDOW_MS).toISOString());
       if (error) throw error;
@@ -1091,7 +1255,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
         // recent (abandoned public payments free the slot). Cancelled / no_show
         // / rejected never block.
         const blocks =
-          r.status === "confirmed" || r.status === "in_progress" || r.status === "completed" ||
+          r.status === "confirmed" ||
+          r.status === "in_progress" ||
+          r.status === "completed" ||
           (r.status === "pending" && new Date(r.created_at).getTime() > sixtyMinutesAgo);
         if (!blocks) continue;
         const rStart = new Date(r.start_at).getTime();
@@ -1103,15 +1269,20 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
   });
 
   useEffect(() => {
-    if (!room?.rate_group_id || !startAt) { setBreakdown(null); return; }
+    if (!room?.rate_group_id || !startAt) {
+      setBreakdown(null);
+      return;
+    }
     if (step !== "room-detail" && step !== "details" && step !== "payment") return;
     let cancel = false;
     const selectedExtras = Object.entries(extraQty)
       .filter(([, q]) => q > 0)
       .map(([id, q]) => {
-        const ex = extras?.find(e => e.id === id);
+        const ex = extras?.find((e) => e.id === id);
+        if (!ex || !extraAvailableForRoom(ex, room)) return null;
         return { extraId: id, qty: q, price: Number(ex?.price ?? 0) };
-      });
+      })
+      .filter((e): e is { extraId: string; qty: number; price: number } => Boolean(e));
     calculatePrice({
       rateGroupId: room.rate_group_id,
       durationMin: pricingDuration,
@@ -1122,10 +1293,22 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       startAt,
       extras: selectedExtras,
     })
-      .then(b => { if (!cancel) setBreakdown(b); })
-      .catch(() => { if (!cancel) setBreakdown(null); });
-    return () => { cancel = true; };
+      .then((b) => {
+        if (!cancel) setBreakdown(b);
+      })
+      .catch(() => {
+        if (!cancel) setBreakdown(null);
+      });
+    return () => {
+      cancel = true;
+    };
   }, [room, withJacuzzi, isOvernight, people, startAt, pricingDuration, extras, extraQty, step]);
+
+  // En cada salto de página del flujo (cambio de `step`) subimos al inicio, para
+  // que la nueva vista no aparezca desplazada hacia abajo tras el paso anterior.
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [step]);
 
   const goSearch = () => {
     if (!date || !time) return toast.error("Selecciona fecha y hora");
@@ -1176,13 +1359,24 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
   const selectRoom = (r: RoomLite) => {
     setRoom(r);
     setWithJacuzzi(r.jacuzzi === "always");
+    setExtraQty((current) => {
+      if (!extras) return current;
+      return Object.fromEntries(
+        Object.entries(current).filter(([id]) => {
+          const ex = extras.find((item) => item.id === id);
+          return ex ? extraAvailableForRoom(ex, r) : true;
+        }),
+      );
+    });
     setStep("room-detail");
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Sync step changes into browser history so the back button works
   useEffect(() => {
-    if (handlingPop.current) { handlingPop.current = false; return; }
+    if (handlingPop.current) {
+      handlingPop.current = false;
+      return;
+    }
     if (isFirstHistoryEntry.current) {
       isFirstHistoryEntry.current = false;
       window.history.replaceState({ step }, "");
@@ -1199,7 +1393,6 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       handlingPop.current = true;
       setStep(s);
       if (s === "search") setRoom(null);
-      window.scrollTo({ top: 0, behavior: "smooth" });
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -1207,15 +1400,19 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
 
   const handleBack = () => {
     if (step === "search") return;
-    if (step === "room-detail") { setStep("search"); setRoom(null); }
-    else if (step === "details") setStep("room-detail");
+    if (step === "room-detail") {
+      setStep("search");
+      setRoom(null);
+    } else if (step === "details") setStep("room-detail");
     else if (step === "payment") setStep("details");
   };
 
   const submitDetails = () => {
-    if (!customerName.trim() || !customerEmail.trim()) return toast.error("Nombre y email obligatorios");
+    if (!customerName.trim() || !customerEmail.trim())
+      return toast.error("Nombre y email obligatorios");
     if (!adult) return toast.error("Debes confirmar que eres mayor de 18 años");
-    if (!acceptedTerms) return toast.error("Debes aceptar las condiciones de reserva y políticas de cancelación");
+    if (!acceptedTerms)
+      return toast.error("Debes aceptar las condiciones de reserva y políticas de cancelación");
     setStep("payment");
   };
 
@@ -1225,18 +1422,26 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
   const reserveViaWhatsApp = () => {
     if (!room || !startAt) return;
     const wa = WHATSAPP_NUMBERS[building];
-    if (!wa) { toast.error("No hay WhatsApp disponible para este hotel"); return; }
+    if (!wa) {
+      toast.error("No hay WhatsApp disponible para este hotel");
+      return;
+    }
 
-    const hotelLabel = BUILDINGS.find(b => b.value === building)?.label ?? room.building;
+    const hotelLabel = BUILDINGS.find((b) => b.value === building)?.label ?? room.building;
     const fechaLarga = startAt.toLocaleDateString("es-ES", {
-      weekday: "long", day: "numeric", month: "long", year: "numeric",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
     });
-    const duracion = isOvernight ? "Noche completa (hasta 10:00)" : DURATION_LABELS[pricingDuration];
+    const duracion = isOvernight
+      ? "Noche completa (hasta 10:00)"
+      : DURATION_LABELS[pricingDuration];
 
     const extrasSeleccionados = Object.entries(extraQty)
       .filter(([, q]) => q > 0)
       .map(([id, q]) => {
-        const ex = extras?.find(e => e.id === id);
+        const ex = extras?.find((e) => e.id === id);
         return ex ? `• ${ex.name} x${q}` : null;
       })
       .filter(Boolean);
@@ -1282,7 +1487,10 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       // cleaning / occupied) may have changed since the page loaded. The DB
       // trigger enforces this too, but this gives the customer a clear message.
       const { data: freshRoom } = await supabase
-        .from("rooms").select("status").eq("id", room.id).maybeSingle();
+        .from("rooms")
+        .select("status")
+        .eq("id", room.id)
+        .maybeSingle();
       if (freshRoom && freshRoom.status !== "available") {
         toast.error("Esta habitación ya no está disponible. Por favor, elige otra.");
         setPaying(false);
@@ -1301,44 +1509,86 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
           p_no_contact: noContact,
         } as never,
       );
-      if (customerErr || !customerId) throw customerErr ?? new Error("No se pudo registrar el cliente");
+      if (customerErr || !customerId)
+        throw customerErr ?? new Error("No se pudo registrar el cliente");
 
       const total = payableTotal;
       const deposit = depositAmount;
-      const { data: reservation, error: rerr } = await supabase.from("reservations").insert({
-        room_id: room.id, customer_id: customerId as unknown as string,
-        start_at: startAt.toISOString(), end_at: endAt.toISOString(),
-        with_jacuzzi: room.jacuzzi === "always" ? true : room.jacuzzi === "none" ? false : withJacuzzi,
-        people, is_overnight: isOvernight,
-        base_price: breakdown.base, third_person_surcharge: breakdown.thirdPerson,
-        dynamic_surcharge: breakdown.dynamicSurcharge, dynamic_reason: breakdown.dynamicReason,
-        extras_total: breakdown.extrasTotal, total,
-        deposit_amount: deposit, deposit_paid: false,
-        status: "pending", manual_override: false, created_by_role: "public",
-        promo_code_id: promo?.debug ? null : promo?.id ?? null,
-        discount_amount: discountAmount,
-        internal_notes: promo?.debug
-          ? "Reserva de prueba — descuento debug −99,9%"
-          : promo
-            ? `Código ${promo.code} aplicado (−${eur(discountAmount)} sobre habitación)`
-            : null,
-      }).select("id").single();
+      const { data: reservation, error: rerr } = await supabase
+        .from("reservations")
+        .insert({
+          room_id: room.id,
+          customer_id: customerId as unknown as string,
+          start_at: startAt.toISOString(),
+          end_at: endAt.toISOString(),
+          with_jacuzzi:
+            room.jacuzzi === "always" ? true : room.jacuzzi === "none" ? false : withJacuzzi,
+          people,
+          is_overnight: isOvernight,
+          base_price: breakdown.base,
+          third_person_surcharge: breakdown.thirdPerson,
+          dynamic_surcharge: breakdown.dynamicSurcharge,
+          dynamic_reason: breakdown.dynamicReason,
+          extras_total: breakdown.extrasTotal,
+          total,
+          deposit_amount: deposit,
+          deposit_paid: false,
+          status: "pending",
+          manual_override: false,
+          created_by_role: "public",
+          promo_code_id: promo?.debug ? null : (promo?.id ?? null),
+          discount_amount: discountAmount,
+          internal_notes: promo?.debug
+            ? "Reserva de prueba — descuento debug −99,9%"
+            : promo
+              ? `Código ${promo.code} aplicado (−${eur(discountAmount)} sobre habitación)`
+              : null,
+        })
+        .select("id")
+        .single();
       if (rerr) throw rerr;
       createdReservationId = reservation.id;
 
-      const rows = Object.entries(extraQty).filter(([, q]) => q > 0).map(([extraId, qty]) => {
-        const ex = extras?.find(e => e.id === extraId);
-        const msg = ex && decorationNeedsMessage(ex) ? decoMessages[extraId] : undefined;
-        return {
-          reservation_id: reservation.id, extra_id: extraId, qty,
-          unit_price: Number(ex?.price ?? 0), is_gift: false,
-          bed_message: msg?.bed.trim() || null,
-          screen_message: msg?.screen.trim() || null,
-        };
-      });
+      const rows = Object.entries(extraQty)
+        .filter(([, q]) => q > 0)
+        .map(([extraId, qty]) => {
+          const ex = extras?.find((e) => e.id === extraId);
+          if (!ex || !extraAvailableForRoom(ex, room)) return null;
+          const msg = ex && decorationNeedsMessage(ex) ? decoMessages[extraId] : undefined;
+          return {
+            reservation_id: reservation.id,
+            extra_id: extraId,
+            qty,
+            unit_price: Number(ex?.price ?? 0),
+            is_gift: false,
+            bed_message: msg?.bed.trim() || null,
+            screen_message: msg?.screen.trim() || null,
+          };
+        })
+        .filter(
+          (
+            row,
+          ): row is {
+            reservation_id: string;
+            extra_id: string;
+            qty: number;
+            unit_price: number;
+            is_gift: boolean;
+            bed_message: string | null;
+            screen_message: string | null;
+          } => Boolean(row),
+        );
       for (const giftId of breakdown.giftedExtraIds) {
-        if (!rows.some(r => r.extra_id === giftId))
-          rows.push({ reservation_id: reservation.id, extra_id: giftId, qty: 1, unit_price: 0, is_gift: true, bed_message: null, screen_message: null });
+        if (!rows.some((r) => r.extra_id === giftId))
+          rows.push({
+            reservation_id: reservation.id,
+            extra_id: giftId,
+            qty: 1,
+            unit_price: 0,
+            is_gift: true,
+            bed_message: null,
+            screen_message: null,
+          });
       }
       if (rows.length > 0) await supabase.from("reservation_extras").insert(rows);
 
@@ -1358,7 +1608,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
           } else if ((redsysErr as any).message) {
             msg = (redsysErr as any).message;
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         console.error("[pago] error de edge function:", redsysErr);
         throw new Error(msg);
       }
@@ -1389,10 +1641,14 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       // Note: setPaying(false) intentionally omitted — browser navigates away
     } catch (e: any) {
       if (createdReservationId) {
-        await supabase.from("reservation_extras").delete().eq("reservation_id", createdReservationId);
+        await supabase
+          .from("reservation_extras")
+          .delete()
+          .eq("reservation_id", createdReservationId);
         await supabase.from("reservations").delete().eq("id", createdReservationId);
       }
-      const msg = e?.message ?? e?.details ?? e?.hint ?? JSON.stringify(e) ?? "Error al procesar el pago";
+      const msg =
+        e?.message ?? e?.details ?? e?.hint ?? JSON.stringify(e) ?? "Error al procesar el pago";
       console.error("[pago] excepción en createReservation:", e);
       toast.error(msg);
       setPaying(false);
@@ -1404,7 +1660,8 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
 
   // Room subtotal a promo code can discount — extras are always excluded.
   const roomSubtotal = useMemo(
-    () => (breakdown ? round2(breakdown.base + breakdown.thirdPerson + breakdown.dynamicSurcharge) : 0),
+    () =>
+      breakdown ? round2(breakdown.base + breakdown.thirdPerson + breakdown.dynamicSurcharge) : 0,
     [breakdown],
   );
 
@@ -1413,7 +1670,10 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
   const discountAmount = useMemo(() => {
     if (!breakdown || !promo) return 0;
     if (promo.debug) return round2(breakdown.total * DEBUG_DISCOUNT_PCT);
-    return discountEurosForRoom({ discount_type: promo.type, discount_value: promo.value }, roomSubtotal);
+    return discountEurosForRoom(
+      { discount_type: promo.type, discount_value: promo.value },
+      roomSubtotal,
+    );
   }, [breakdown, promo, roomSubtotal]);
 
   // Total actually charged, after any discount code, and the 30% deposit taken
@@ -1453,69 +1713,96 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
 
   const extrasTotalSelected = useMemo(() => {
     return Object.entries(extraQty).reduce((s, [id, q]) => {
-      const ex = extras?.find(e => e.id === id);
+      const ex = extras?.find((e) => e.id === id);
+      if (!ex || (room && !extraAvailableForRoom(ex, room))) return s;
       return s + q * Number(ex?.price ?? 0);
     }, 0);
-  }, [extraQty, extras]);
+  }, [extraQty, extras, room]);
 
   const changeQty = (id: string, delta: number) =>
-    setExtraQty(p => ({ ...p, [id]: Math.max(0, (p[id] ?? 0) + delta) }));
+    setExtraQty((p) => ({ ...p, [id]: Math.max(0, (p[id] ?? 0) + delta) }));
 
   const setDecoMessage = (id: string, field: keyof DecoMessage, value: string) =>
-    setDecoMessages(p => {
+    setDecoMessages((p) => {
       const cur = p[id] ?? { bed: "", screen: "" };
       return { ...p, [id]: { ...cur, [field]: value } };
     });
 
   // Decorations the customer has actually added that require phrases
   const selectedDecoNeedingMessage = useMemo(
-    () => (extras ?? []).filter(e => decorationNeedsMessage(e) && (extraQty[e.id] ?? 0) > 0),
-    [extras, extraQty],
+    () =>
+      (extras ?? []).filter(
+        (e) =>
+          decorationNeedsMessage(e) &&
+          (extraQty[e.id] ?? 0) > 0 &&
+          (!room || extraAvailableForRoom(e, room)),
+      ),
+    [extras, extraQty, room],
   );
 
   // Returns an error message if any required phrase is missing or too long
   const validateDecoMessages = (): string | null => {
     for (const ex of selectedDecoNeedingMessage) {
       const m = decoMessages[ex.id] ?? { bed: "", screen: "" };
+      const surfaceLabel = room ? messageSurfaceLabel(room).toLowerCase() : "mensaje en el cristal";
       if (!m.bed.trim() || !m.screen.trim())
-        return `Escribe la frase de la cama y de la pantalla para «${ex.name}»`;
+        return `Escribe la frase de la cama y el ${surfaceLabel} para «${ex.name}»`;
       if (countWords(m.bed) > BED_MESSAGE_MAX_WORDS)
         return `La frase en la cama de «${ex.name}» admite máximo ${BED_MESSAGE_MAX_WORDS} palabras`;
       if (countWords(m.screen) > SCREEN_MESSAGE_MAX_WORDS)
-        return `La frase en la pantalla de «${ex.name}» admite máximo ${SCREEN_MESSAGE_MAX_WORDS} palabras`;
+        return `El ${surfaceLabel} de «${ex.name}» admite máximo ${SCREEN_MESSAGE_MAX_WORDS} palabras`;
     }
     return null;
   };
 
   // Inputs shown under a decoration card once it has been added to the order
-  const renderDecoMessageInputs = (ex: ExtraLite) => {
+  const renderDecoMessageInputs = (
+    ex: ExtraLite,
+    contextRoom?: { name: string; building: string } | null,
+  ) => {
     if (!decorationNeedsMessage(ex) || (extraQty[ex.id] ?? 0) <= 0) return null;
     const m = decoMessages[ex.id] ?? { bed: "", screen: "" };
     const bedOver = countWords(m.bed) > BED_MESSAGE_MAX_WORDS;
     const screenOver = countWords(m.screen) > SCREEN_MESSAGE_MAX_WORDS;
+    const effectiveRoom = contextRoom ?? room;
+    const surfaceLabel = effectiveRoom
+      ? messageSurfaceLabel(effectiveRoom)
+      : "Mensaje en el cristal";
     return (
-      <div className="rm-deco-msg" onClick={e => e.stopPropagation()}>
+      <div className="rm-deco-msg" onClick={(e) => e.stopPropagation()}>
         <div className="rm-deco-msg-field">
-          <label className="rm-deco-msg-label">Frase en la cama (máx. {BED_MESSAGE_MAX_WORDS} palabras) *</label>
+          <label className="rm-deco-msg-label">
+            Frase en la cama (máx. {BED_MESSAGE_MAX_WORDS} palabras) *
+          </label>
           <input
             className={`rm-deco-msg-input${bedOver ? " rm-invalid" : ""}`}
             value={m.bed}
             maxLength={40}
             placeholder="Ej. Te amo"
-            onChange={e => setDecoMessage(ex.id, "bed", e.target.value)}
+            onChange={(e) => setDecoMessage(ex.id, "bed", e.target.value)}
           />
-          {bedOver && <span className="rm-deco-msg-hint rm-over">Máximo {BED_MESSAGE_MAX_WORDS} palabras</span>}
+          {bedOver && (
+            <span className="rm-deco-msg-hint rm-over">
+              Máximo {BED_MESSAGE_MAX_WORDS} palabras
+            </span>
+          )}
         </div>
         <div className="rm-deco-msg-field">
-          <label className="rm-deco-msg-label">Frase en el cristal o pantalla LED (máx. {SCREEN_MESSAGE_MAX_WORDS} palabras) *</label>
+          <label className="rm-deco-msg-label">
+            {surfaceLabel} (máx. {SCREEN_MESSAGE_MAX_WORDS} palabras) *
+          </label>
           <input
             className={`rm-deco-msg-input${screenOver ? " rm-invalid" : ""}`}
             value={m.screen}
             maxLength={120}
             placeholder="Ej. Feliz aniversario mi amor"
-            onChange={e => setDecoMessage(ex.id, "screen", e.target.value)}
+            onChange={(e) => setDecoMessage(ex.id, "screen", e.target.value)}
           />
-          {screenOver && <span className="rm-deco-msg-hint rm-over">Máximo {SCREEN_MESSAGE_MAX_WORDS} palabras</span>}
+          {screenOver && (
+            <span className="rm-deco-msg-hint rm-over">
+              Máximo {SCREEN_MESSAGE_MAX_WORDS} palabras
+            </span>
+          )}
         </div>
       </div>
     );
@@ -1523,6 +1810,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
 
   return (
     <div className="rm-page">
+      <PublicAnalytics />
       <style>{CSS}</style>
 
       {/* Age banner */}
@@ -1531,44 +1819,17 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
         Reservas exclusivas para mayores de 18 años · Solo adultos
       </div>
 
-      {/* Header */}
-      <header className="rm-header">
-        <div className="rm-header-inner">
-          <a href="https://www.roomsmadrid.es/" target="_blank" rel="noreferrer" aria-label="Rooms Madrid">
-            <img className="rm-logo-img" src="/brand/rooms-madrid-horizontal-blanco.svg" alt="Rooms Madrid" />
-          </a>
-
-          {step !== "search" && step !== "done" && (
-            <button className="rm-back" onClick={handleBack}>← Atrás</button>
-          )}
-
-          <a
-            href="https://www.roomsmadrid.es/"
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              marginLeft: "auto",
-              display: "flex", alignItems: "center", gap: 6,
-              background: "linear-gradient(180deg, var(--blood-light) 0%, var(--blood) 100%)", color: "#fff",
-              borderRadius: 7, padding: "6px 14px",
-              fontSize: 12, fontWeight: 600, letterSpacing: "0.05em",
-              textDecoration: "none", whiteSpace: "nowrap",
-              transition: "background 0.2s",
-            }}
-          >
-            <Globe size={13} />
-            roomsmadrid.es
-          </a>
-
-          <div className="rm-help" style={{ marginLeft: 12 }}>
-            <Phone size={13} />
-            <span>¿Reservas?</span>
-            <a href={CONTACTS[building]?.phones[0]?.href ?? "tel:+34910076100"}>
-              {CONTACTS[building]?.phones[0]?.number ?? "91 007 61 00"}
-            </a>
-          </div>
-        </div>
-      </header>
+      {/* Header — menú del sitio (roomsmadrid.es) + controles del flujo */}
+      <SiteHeader
+        booking={{
+          showBack: step !== "search" && step !== "done",
+          onBack: handleBack,
+          phone: CONTACTS[building]?.phones[0] ?? {
+            number: "91 007 61 00",
+            href: "tel:+34910076100",
+          },
+        }}
+      />
 
       {/* Step indicator */}
       {step !== "done" && (
@@ -1576,7 +1837,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
           <div className="rm-steps-inner">
             {STEPS.map((s, i) => (
               <div key={s.key} style={{ display: "contents" }}>
-                <div className={`rm-step ${i === currentStepIdx ? "active" : i < currentStepIdx ? "done" : ""}`}>
+                <div
+                  className={`rm-step ${i === currentStepIdx ? "active" : i < currentStepIdx ? "done" : ""}`}
+                >
                   <div className="rm-step-num">{i < currentStepIdx ? "✓" : i + 1}</div>
                   <span>{s.label}</span>
                 </div>
@@ -1588,7 +1851,6 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       )}
 
       <main className="rm-main">
-
         {/* ── STEP 1: SEARCH ── */}
         {step === "search" && (
           <section>
@@ -1598,8 +1860,15 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 Madrid · Habitaciones temáticas
                 <Star size={12} />
               </div>
-              <h1 className="rm-serif">Tu escapada <em>perfecta</em><br />empieza aquí</h1>
-              <p>Habitaciones únicas con jacuzzi en el centro de Madrid. Sin registro, con confirmación inmediata.</p>
+              <h1 className="rm-serif">
+                Tu escapada <em>perfecta</em>
+                <br />
+                empieza aquí
+              </h1>
+              <p>
+                Habitaciones únicas con jacuzzi en el centro de Madrid. Sin registro, con
+                confirmación inmediata.
+              </p>
             </div>
 
             <div className="rm-search-card">
@@ -1608,7 +1877,11 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   <label className="rm-label">Fecha</label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" className="w-full justify-start text-left font-normal">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                      >
                         <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                         {date || <span className="text-muted-foreground">Selecciona fecha</span>}
                       </Button>
@@ -1617,8 +1890,8 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                       <Calendar
                         mode="single"
                         selected={date ? new Date(`${date}T00:00:00`) : undefined}
-                        onSelect={d => setDate(d ? format(d, "yyyy-MM-dd") : "")}
-                        disabled={d => d < new Date(new Date().toDateString())}
+                        onSelect={(d) => setDate(d ? format(d, "yyyy-MM-dd") : "")}
+                        disabled={(d) => d < new Date(new Date().toDateString())}
                         contactPhones={CONTACTS[building]?.phones}
                         restrictContactDays
                         initialFocus
@@ -1628,22 +1901,37 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 </div>
 
                 <div className="rm-field">
-                  <label className="rm-label" style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <MapPin size={11} />Localización
+                  <label
+                    className="rm-label"
+                    style={{ display: "flex", alignItems: "center", gap: 5 }}
+                  >
+                    <MapPin size={11} />
+                    Localización
                   </label>
                   <select
                     className="rm-building-select"
                     value={building}
-                    onChange={e => setBuilding(e.target.value)}
+                    onChange={(e) => setBuilding(e.target.value)}
                   >
-                    {BUILDINGS.map(b => (
-                      <option key={b.value} value={b.value}>{b.label}</option>
+                    {BUILDINGS.map((b) => (
+                      <option key={b.value} value={b.value}>
+                        {b.label}
+                      </option>
                     ))}
                   </select>
                   {building !== "all" && (
-                    <div style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "var(--ink-soft)",
+                        marginTop: 4,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
                       <MapPin size={10} />
-                      {BUILDINGS.find(b => b.value === building)?.address}
+                      {BUILDINGS.find((b) => b.value === building)?.address}
                     </div>
                   )}
                 </div>
@@ -1653,7 +1941,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   <select
                     className="rm-building-select"
                     value={time}
-                    onChange={e => setTime(e.target.value)}
+                    onChange={(e) => setTime(e.target.value)}
                   >
                     {isOvernight
                       ? Array.from({ length: 8 }, (_, i) => {
@@ -1661,23 +1949,33 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                           const hh = String(Math.floor(totalMin / 60)).padStart(2, "0");
                           const mm = String(totalMin % 60).padStart(2, "0");
                           const val = `${hh}:${mm}`;
-                          return <option key={val} value={val}>{val}</option>;
+                          return (
+                            <option key={val} value={val}>
+                              {val}
+                            </option>
+                          );
                         })
                       : Array.from({ length: 96 }, (_, i) => {
                           const totalMin = i * 15;
                           const hh = String(Math.floor(totalMin / 60)).padStart(2, "0");
                           const mm = String(totalMin % 60).padStart(2, "0");
                           const val = `${hh}:${mm}`;
-                          return <option key={val} value={val}>{val}</option>;
-                        })
-                    }
+                          return (
+                            <option key={val} value={val}>
+                              {val}
+                            </option>
+                          );
+                        })}
                   </select>
                 </div>
 
                 <div className="rm-overnight-row">
                   <div>
                     <div className="rm-overnight-row-label">
-                      <Moon size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                      <Moon
+                        size={14}
+                        style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }}
+                      />
                       Noche completa
                     </div>
                     <div className="rm-overnight-row-sub">
@@ -1690,7 +1988,10 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   </div>
                   <Switch
                     checked={isOvernight}
-                    onCheckedChange={v => { setIsOvernight(v); if (v && time < "22:00") setTime("22:00"); }}
+                    onCheckedChange={(v) => {
+                      setIsOvernight(v);
+                      if (v && time < "22:00") setTime("22:00");
+                    }}
                     disabled={!overnightAllowed}
                   />
                 </div>
@@ -1701,9 +2002,13 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                     <select
                       className="rm-building-select"
                       value={String(duration)}
-                      onChange={e => setDuration(Number(e.target.value))}
+                      onChange={(e) => setDuration(Number(e.target.value))}
                     >
-                      {DURATIONS.map(d => <option key={d} value={String(d)}>{DURATION_LABELS[d]}</option>)}
+                      {DURATIONS.map((d) => (
+                        <option key={d} value={String(d)}>
+                          {DURATION_LABELS[d]}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -1713,19 +2018,19 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   <select
                     className="rm-building-select"
                     value={String(people)}
-                    onChange={e => setPeople(Number(e.target.value))}
+                    onChange={(e) => setPeople(Number(e.target.value))}
                   >
                     {/* Noche completa: solo 2 personas (no hay suplemento 3ª/4ª
                         persona en tarifa de noche). Por horas: 2, 3 o 4. */}
-                    {(isOvernight ? [2] : [2, 3, 4]).map(n => <option key={n} value={String(n)}>{n} personas</option>)}
+                    {(isOvernight ? [2] : [2, 3, 4]).map((n) => (
+                      <option key={n} value={String(n)}>
+                        {n} personas
+                      </option>
+                    ))}
                   </select>
                 </div>
 
-                <button
-                  className="rm-btn-primary"
-                  onClick={goSearch}
-                  disabled={!date || !time}
-                >
+                <button className="rm-btn-primary" onClick={goSearch} disabled={!date || !time}>
                   Ver habitaciones disponibles <ChevronRight size={16} />
                 </button>
               </div>
@@ -1737,15 +2042,22 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 <div className="rm-section-header">
                   <h2 className="rm-serif">Habitaciones disponibles</h2>
                   <p>
-                    {startAt?.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
-                    {" · "}{time}{" · "}
+                    {startAt?.toLocaleDateString("es-ES", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                    })}
+                    {" · "}
+                    {time}
+                    {" · "}
                     {isOvernight ? "Noche completa" : DURATION_LABELS[pricingDuration]}
-                    {" · "}{people} {people === 1 ? "persona" : "personas"}
+                    {" · "}
+                    {people} {people === 1 ? "persona" : "personas"}
                   </p>
                 </div>
 
                 <div className="rm-rooms-list">
-                  {availableRooms.map(r => {
+                  {availableRooms.map((r) => {
                     const fromPrice = fromPriceByRoom.get(r.id);
                     // A room is unavailable for booking when it has a time conflict
                     // with an existing reservation OR when staff set its manual
@@ -1758,14 +2070,35 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                     const overnightBlocked = isOvernight && r.allows_overnight === false;
                     const blocked = unavailable || overnightBlocked;
                     const isExpanded = expandedExtrasRoom === r.id;
-                    const roomExtras = extras?.filter(e => e.category !== "services") ?? [];
-                    const selectedInRoom = roomExtras.filter(e => (extraQty[e.id] ?? 0) > 0);
+                    const roomExtras =
+                      extras?.filter(
+                        (e) => e.category !== "services" && extraAvailableForRoom(e, r),
+                      ) ?? [];
+                    const selectedInRoom = roomExtras.filter((e) => (extraQty[e.id] ?? 0) > 0);
 
                     return (
-                      <div key={r.id} className={`rm-room-card${blocked ? " rm-unavailable" : ""}`} style={{ position: "relative", ...(featuredName && r.name === featuredName && !blocked ? { boxShadow: "0 0 0 2px var(--gold)" } : {}) }}>
+                      <div
+                        key={r.id}
+                        className={`rm-room-card${blocked ? " rm-unavailable" : ""}`}
+                        style={{
+                          position: "relative",
+                          ...(featuredName && r.name === featuredName && !blocked
+                            ? { boxShadow: "0 0 0 2px var(--gold)" }
+                            : {}),
+                        }}
+                      >
                         {blocked && (
                           <div className="rm-unavailable-overlay">
-                            <div className="rm-unavailable-pill" style={{ flexDirection: "column", alignItems: "center", gap: 6, padding: "12px 20px", textAlign: "center" }}>
+                            <div
+                              className="rm-unavailable-pill"
+                              style={{
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 6,
+                                padding: "12px 20px",
+                                textAlign: "center",
+                              }}
+                            >
                               {unavailable ? (
                                 <>
                                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -1774,9 +2107,25 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                                       ? "No está disponible en este momento"
                                       : "No disponible para este horario"}
                                   </div>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, opacity: 0.85 }}>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: 2,
+                                      fontSize: 12,
+                                      opacity: 0.85,
+                                    }}
+                                  >
                                     {CONTACTS[buildingKey(r.building)]?.phones.map((p, i) => (
-                                      <a key={i} href={p.href} style={{ color: "var(--gold-light)", textDecoration: "none", fontWeight: 500 }}>
+                                      <a
+                                        key={i}
+                                        href={p.href}
+                                        style={{
+                                          color: "var(--gold-light)",
+                                          textDecoration: "none",
+                                          fontWeight: 500,
+                                        }}
+                                      >
                                         {p.number}
                                       </a>
                                     ))}
@@ -1793,17 +2142,31 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                         )}
                         <div className="rm-room-top">
                           <div className="rm-room-img" style={{ padding: 0 }}>
-                            <RoomImageCarousel images={getRoomImages(r)} alt={r.name} height="100%" className="rm-room-img" />
+                            <RoomImageCarousel
+                              images={getRoomImages(r)}
+                              alt={r.name}
+                              height="100%"
+                              className="rm-room-img"
+                            />
                           </div>
                           <div className="rm-room-info">
                             <div className="rm-room-building">RM {r.building}</div>
                             <div className="rm-room-name rm-serif">{r.name}</div>
                             <div className="rm-room-badges">
-                              {hasScreen(r) && <span className="rm-badge"><Tv size={11} />Pantalla disponible</span>}
+                              {hasScreen(r) && (
+                                <span className="rm-badge">
+                                  <Tv size={11} />
+                                  Pantalla disponible
+                                </span>
+                              )}
+                              {hasLedCube(r) && (
+                                <span className="rm-badge">
+                                  <Tv size={11} />
+                                  Cubo LED
+                                </span>
+                              )}
                             </div>
-                            <div className="rm-room-desc">
-                              {getRoomDescription(r)}
-                            </div>
+                            <div className="rm-room-desc">{getRoomDescription(r)}</div>
                           </div>
                           <div className="rm-room-cta">
                             <div>
@@ -1813,7 +2176,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                                   <div className="rm-price-amount rm-serif">{eur(fromPrice)}</div>
                                 </>
                               ) : (
-                                <div style={{ fontSize: 13, color: "var(--ink-soft)" }}>Consultar</div>
+                                <div style={{ fontSize: 13, color: "var(--ink-soft)" }}>
+                                  Consultar
+                                </div>
                               )}
                             </div>
                             <button
@@ -1822,7 +2187,11 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                               disabled={!!blocked}
                               style={blocked ? { opacity: 0.35, cursor: "not-allowed" } : {}}
                             >
-                              {unavailable ? "No disponible" : overnightBlocked ? "Solo por horas" : "Elegir esta"}
+                              {unavailable
+                                ? "No disponible"
+                                : overnightBlocked
+                                  ? "Solo por horas"
+                                  : "Elegir esta"}
                             </button>
                           </div>
                         </div>
@@ -1838,54 +2207,132 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                                 <Gift size={14} />
                                 Añadir extras
                                 {selectedInRoom.length > 0 && (
-                                  <span style={{ background: "var(--gold)", color: "var(--ink)", borderRadius: 20, padding: "1px 8px", fontSize: 11, fontWeight: 600 }}>
-                                    {selectedInRoom.length} seleccionado{selectedInRoom.length > 1 ? "s" : ""}
+                                  <span
+                                    style={{
+                                      background: "rgba(115,20,35,0.12)",
+                                      color: "var(--blood-dark)",
+                                      border: "1px solid rgba(115,20,35,0.25)",
+                                      borderRadius: 20,
+                                      padding: "1px 8px",
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {selectedInRoom.length} seleccionado
+                                    {selectedInRoom.length > 1 ? "s" : ""}
                                   </span>
                                 )}
                               </span>
-                              <span style={{ fontSize: 20, lineHeight: 1, color: "var(--ink-soft)" }}>{isExpanded ? "−" : "+"}</span>
+                              <span
+                                style={{ fontSize: 20, lineHeight: 1, color: "var(--ink-soft)" }}
+                              >
+                                {isExpanded ? "−" : "+"}
+                              </span>
                             </button>
 
                             {isExpanded && (
                               <>
-                                {(["decoration", "hookah", "accessories", "drinks"] as const).map(cat => {
-                                  const items = roomExtras.filter(e => e.category === cat);
-                                  if (!items.length) return null;
-                                  return (
-                                    <div key={cat} style={{ marginBottom: 20 }}>
-                                      <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 10, marginTop: 16 }}>
-                                        {EXTRA_CATEGORY_LABELS[cat] ?? cat}
-                                      </div>
-                                      <div className="rm-extras-grid">
-                                        {items.map(ex => {
-                                          const q = extraQty[ex.id] ?? 0;
-                                          return (
-                                            <div key={ex.id} className={`rm-extra-item${q > 0 ? " selected" : ""}`}>
-                                              {ex.category === "decoration" && <DecorationCarousel images={DECORATION_PHOTOS} />}
-                                              <div className="rm-extra-body">
-                                                <div className="rm-extra-name">{ex.name}</div>
-                                                {ex.description && <div className="rm-extra-desc">{ex.description}</div>}
-                                                <div className="rm-extra-footer">
-                                                  <div className="rm-extra-price rm-serif">{eur(Number(ex.price))}</div>
-                                                  <div className="rm-extra-qty">
-                                                    <button className="rm-qty-btn" onClick={e => { e.stopPropagation(); changeQty(ex.id, -1); }}>−</button>
-                                                    <span className="rm-qty-val">{q}</span>
-                                                    <button className="rm-qty-btn" onClick={e => { e.stopPropagation(); changeQty(ex.id, 1); }}>+</button>
+                                {(["decoration", "hookah", "accessories", "drinks"] as const).map(
+                                  (cat) => {
+                                    const items = roomExtras.filter(
+                                      (e) =>
+                                        e.category === cat && swingExtraMatchesMode(e, isOvernight),
+                                    );
+                                    if (!items.length) return null;
+                                    return (
+                                      <div key={cat} style={{ marginBottom: 20 }}>
+                                        <div
+                                          style={{
+                                            fontSize: 11,
+                                            letterSpacing: "0.1em",
+                                            textTransform: "uppercase",
+                                            color: "var(--gold)",
+                                            fontWeight: 500,
+                                            marginBottom: 10,
+                                            marginTop: 16,
+                                          }}
+                                        >
+                                          {EXTRA_CATEGORY_LABELS[cat] ?? cat}
+                                        </div>
+                                        <div className="rm-extras-grid">
+                                          {items.map((ex) => {
+                                            const q = extraQty[ex.id] ?? 0;
+                                            return (
+                                              <div
+                                                key={ex.id}
+                                                className={`rm-extra-item${q > 0 ? " selected" : ""}`}
+                                              >
+                                                {ex.category === "decoration" && (
+                                                  <DecorationCarousel images={DECORATION_PHOTOS} />
+                                                )}
+                                                <div className="rm-extra-body">
+                                                  <div className="rm-extra-name">
+                                                    {displayExtraName(ex)}
                                                   </div>
+                                                  {ex.description && (
+                                                    <div className="rm-extra-desc">
+                                                      {ex.description}
+                                                    </div>
+                                                  )}
+                                                  <div className="rm-extra-footer">
+                                                    <div className="rm-extra-price rm-serif">
+                                                      {eur(Number(ex.price))}
+                                                    </div>
+                                                    <div className="rm-extra-qty">
+                                                      <button
+                                                        className="rm-qty-btn"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          changeQty(ex.id, -1);
+                                                        }}
+                                                      >
+                                                        −
+                                                      </button>
+                                                      <span className="rm-qty-val">{q}</span>
+                                                      <button
+                                                        className="rm-qty-btn"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          changeQty(ex.id, 1);
+                                                        }}
+                                                      >
+                                                        +
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                  {renderDecoMessageInputs(ex, r)}
                                                 </div>
-                                                {renderDecoMessageInputs(ex)}
                                               </div>
-                                            </div>
-                                          );
-                                        })}
+                                            );
+                                          })}
+                                        </div>
                                       </div>
-                                    </div>
-                                  );
-                                })}
+                                    );
+                                  },
+                                )}
                                 {extrasTotalSelected > 0 && (
-                                  <div style={{ paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>Extras seleccionados</span>
-                                    <span style={{ fontFamily: "'Playfair', serif", fontSize: 20, color: "var(--gold-dark)", fontWeight: 500 }}>{eur(extrasTotalSelected)}</span>
+                                  <div
+                                    style={{
+                                      paddingTop: 12,
+                                      borderTop: "1px solid var(--border)",
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>
+                                      Extras seleccionados
+                                    </span>
+                                    <span
+                                      style={{
+                                        fontFamily: "'Playfair', serif",
+                                        fontSize: 20,
+                                        color: "var(--gold-dark)",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      {eur(extrasTotalSelected)}
+                                    </span>
                                   </div>
                                 )}
                               </>
@@ -1902,19 +2349,31 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
             {!date && (
               <div className="rm-trust" style={{ marginTop: 40 }}>
                 <div className="rm-trust-item">
-                  <div className="rm-trust-icon"><Clock size={22} color="var(--gold)" /></div>
-                  <div className="rm-trust-title">Sin registro</div>
-                  <div className="rm-trust-sub">Reserva en 2 minutos.</div>
+                  <div className="rm-trust-icon">
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <div className="rm-trust-title">Sin registro</div>
+                    <div className="rm-trust-sub">Reserva en 2 minutos.</div>
+                  </div>
                 </div>
                 <div className="rm-trust-item">
-                  <div className="rm-trust-icon"><CreditCard size={22} color="var(--gold)" /></div>
-                  <div className="rm-trust-title">Solo 30% online</div>
-                  <div className="rm-trust-sub">El resto al llegar.</div>
+                  <div className="rm-trust-icon">
+                    <CreditCard size={20} />
+                  </div>
+                  <div>
+                    <div className="rm-trust-title">Solo 30% online</div>
+                    <div className="rm-trust-sub">El resto al llegar.</div>
+                  </div>
                 </div>
                 <div className="rm-trust-item">
-                  <div className="rm-trust-icon"><Flame size={22} color="var(--gold)" /></div>
-                  <div className="rm-trust-title">Confirmación al instante</div>
-                  <div className="rm-trust-sub">Email en segundos.</div>
+                  <div className="rm-trust-icon">
+                    <Flame size={20} />
+                  </div>
+                  <div>
+                    <div className="rm-trust-title">Confirmación al instante</div>
+                    <div className="rm-trust-sub">Email en segundos.</div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1929,10 +2388,42 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
               <div className="rm-card" style={{ padding: 0, overflow: "hidden", marginBottom: 20 }}>
                 <RoomImageCarousel images={getRoomImages(room)} alt={room.name} height={260} />
                 <div style={{ padding: "24px 28px" }}>
-                  <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 6 }}>RM {room.building}</div>
-                  <div style={{ fontFamily: "'Playfair', serif", fontSize: 30, fontWeight: 500, color: "var(--ink)", marginBottom: 12 }}>{room.name}</div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: "0.14em",
+                      textTransform: "uppercase",
+                      color: "var(--gold)",
+                      fontWeight: 500,
+                      marginBottom: 6,
+                    }}
+                  >
+                    RM {room.building}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'Playfair', serif",
+                      fontSize: 30,
+                      fontWeight: 500,
+                      color: "var(--ink)",
+                      marginBottom: 12,
+                    }}
+                  >
+                    {room.name}
+                  </div>
                   <div className="rm-room-badges">
-                    {hasScreen(room) && <span className="rm-badge"><Tv size={11} />Pantalla disponible</span>}
+                    {hasScreen(room) && (
+                      <span className="rm-badge">
+                        <Tv size={11} />
+                        Pantalla disponible
+                      </span>
+                    )}
+                    {hasLedCube(room) && (
+                      <span className="rm-badge">
+                        <Tv size={11} />
+                        Cubo LED
+                      </span>
+                    )}
                   </div>
 
                   {/* Contact options */}
@@ -1943,10 +2434,19 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                          height: 48, borderRadius: 10, background: "#25D366", color: "#fff",
-                          fontSize: 13, fontWeight: 600, letterSpacing: "0.06em",
-                          textDecoration: "none", textTransform: "uppercase",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 8,
+                          height: 48,
+                          borderRadius: 10,
+                          background: "#25D366",
+                          color: "#fff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          letterSpacing: "0.06em",
+                          textDecoration: "none",
+                          textTransform: "uppercase",
                           fontFamily: "'Noto Sans', sans-serif",
                         }}
                       >
@@ -1957,64 +2457,143 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                       <a
                         href={CONTACTS[building].phones[1].href}
                         style={{
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                          height: 48, borderRadius: 10, border: "1.5px solid var(--border-strong)",
-                          background: "var(--warm-white)", color: "var(--ink)",
-                          fontSize: 13, fontWeight: 600, letterSpacing: "0.06em",
-                          textDecoration: "none", textTransform: "uppercase",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 8,
+                          height: 48,
+                          borderRadius: 10,
+                          border: "1.5px solid var(--border-strong)",
+                          background: "var(--warm-white)",
+                          color: "var(--ink)",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          letterSpacing: "0.06em",
+                          textDecoration: "none",
+                          textTransform: "uppercase",
                           fontFamily: "'Noto Sans', sans-serif",
                         }}
                       >
                         <Phone size={16} /> Consulta por teléfono
                       </a>
                     )}
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "2px 0" }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 12, margin: "2px 0" }}
+                    >
                       <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                      <span style={{ fontSize: 11, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.1em" }}>o reserva online</span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--ink-soft)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.1em",
+                        }}
+                      >
+                        o reserva online
+                      </span>
                       <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
                     </div>
                   </div>
-
                 </div>
               </div>
 
               {/* Extras confirmation */}
               {extras && extras.length > 0 && (
                 <div className="rm-card">
-                  <h2 className="rm-serif" style={{ marginBottom: 6 }}>Extras para tu estancia</h2>
-                  <p style={{ fontSize: 13, color: "var(--ink-soft)", marginBottom: 24 }}>Opcional — puedes continuar sin añadir nada.</p>
+                  <h2 className="rm-serif" style={{ marginBottom: 6 }}>
+                    Extras para tu estancia
+                  </h2>
+                  <p style={{ fontSize: 13, color: "var(--ink-soft)", marginBottom: 24 }}>
+                    Opcional — puedes continuar sin añadir nada.
+                  </p>
 
-                  {(["decoration", "hookah", "accessories", "drinks"] as const).map(cat => {
-                    const items = extras.filter(e => e.category === cat);
+                  {(["decoration", "hookah", "accessories", "drinks"] as const).map((cat) => {
+                    const items = extras.filter(
+                      (e) =>
+                        e.category === cat &&
+                        extraAvailableForRoom(e, room) &&
+                        swingExtraMatchesMode(e, isOvernight),
+                    );
                     if (!items.length) return null;
                     return (
                       <div key={cat} style={{ marginBottom: 24 }}>
-                        <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", fontWeight: 500, marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            color: "var(--gold)",
+                            fontWeight: 500,
+                            marginBottom: 12,
+                          }}
+                        >
                           {EXTRA_CATEGORY_LABELS[cat]}
                         </div>
                         <div className="rm-extras-grid">
-                          {items.map(ex => {
+                          {items.map((ex) => {
                             const q = extraQty[ex.id] ?? 0;
                             const isGift = breakdown?.giftedExtraIds.includes(ex.id);
                             return (
-                              <div key={ex.id} className={`rm-extra-item${q > 0 ? " selected" : ""}`}>
-                                {ex.category === "decoration" && <DecorationCarousel images={DECORATION_PHOTOS} />}
+                              <div
+                                key={ex.id}
+                                className={`rm-extra-item${q > 0 ? " selected" : ""}`}
+                              >
+                                {ex.category === "decoration" && (
+                                  <DecorationCarousel images={DECORATION_PHOTOS} />
+                                )}
                                 <div className="rm-extra-body">
-                                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 4, marginBottom: 2 }}>
-                                    <div className="rm-extra-name">{ex.name}</div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "flex-start",
+                                      justifyContent: "space-between",
+                                      gap: 4,
+                                      marginBottom: 2,
+                                    }}
+                                  >
+                                    <div className="rm-extra-name">{displayExtraName(ex)}</div>
                                     {isGift && q === 0 && (
-                                      <span style={{ background: "var(--cream-dark)", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 7px", fontSize: 10, fontWeight: 500, color: "var(--gold-dark)", whiteSpace: "nowrap" }}>
-                                        <Gift size={9} style={{ display: "inline", marginRight: 3 }} />Regalo
+                                      <span
+                                        style={{
+                                          background: "var(--cream-dark)",
+                                          border: "1px solid var(--border)",
+                                          borderRadius: 6,
+                                          padding: "2px 7px",
+                                          fontSize: 10,
+                                          fontWeight: 500,
+                                          color: "var(--gold-dark)",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        <Gift
+                                          size={9}
+                                          style={{ display: "inline", marginRight: 3 }}
+                                        />
+                                        Regalo
                                       </span>
                                     )}
                                   </div>
-                                  {ex.description && <div className="rm-extra-desc">{ex.description}</div>}
+                                  {ex.description && (
+                                    <div className="rm-extra-desc">{ex.description}</div>
+                                  )}
                                   <div className="rm-extra-footer">
-                                    <div className="rm-extra-price rm-serif">{eur(Number(ex.price))}</div>
+                                    <div className="rm-extra-price rm-serif">
+                                      {eur(Number(ex.price))}
+                                    </div>
                                     <div className="rm-extra-qty">
-                                      <button className="rm-qty-btn" onClick={() => changeQty(ex.id, -1)}>−</button>
+                                      <button
+                                        className="rm-qty-btn"
+                                        onClick={() => changeQty(ex.id, -1)}
+                                      >
+                                        −
+                                      </button>
                                       <span className="rm-qty-val">{q}</span>
-                                      <button className="rm-qty-btn" onClick={() => changeQty(ex.id, 1)}>+</button>
+                                      <button
+                                        className="rm-qty-btn"
+                                        onClick={() => changeQty(ex.id, 1)}
+                                      >
+                                        +
+                                      </button>
                                     </div>
                                   </div>
                                   {renderDecoMessageInputs(ex)}
@@ -2040,7 +2619,15 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 Continuar con mis datos <ChevronRight size={16} />
               </button>
             </div>
-            <SummaryBar room={room} startAt={startAt} endAt={endAt} people={people} isOvernight={isOvernight} duration={pricingDuration} breakdown={breakdown} />
+            <SummaryBar
+              room={room}
+              startAt={startAt}
+              endAt={endAt}
+              people={people}
+              isOvernight={isOvernight}
+              duration={pricingDuration}
+              breakdown={breakdown}
+            />
           </div>
         )}
 
@@ -2052,15 +2639,29 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
               <div className="rm-form-grid">
                 <div className="rm-field">
                   <label className="rm-label">Nombre completo *</label>
-                  <Input value={customerName} onChange={e => setCustomerName(e.target.value)} maxLength={100} />
+                  <Input
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    maxLength={100}
+                  />
                 </div>
                 <div className="rm-field">
                   <label className="rm-label">Email *</label>
-                  <Input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} maxLength={255} />
+                  <Input
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    maxLength={255}
+                  />
                 </div>
                 <div className="rm-field rm-form-full">
                   <label className="rm-label">Teléfono (opcional)</label>
-                  <Input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} maxLength={30} />
+                  <Input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    maxLength={30}
+                  />
                 </div>
               </div>
 
@@ -2068,20 +2669,29 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <label className="rm-check-row">
-                  <Checkbox checked={adult} onCheckedChange={v => setAdult(v === true)} />
-                  <span>Confirmo que soy <strong>mayor de 18 años</strong>. *</span>
+                  <Checkbox checked={adult} onCheckedChange={(v) => setAdult(v === true)} />
+                  <span>
+                    Confirmo que soy <strong>mayor de 18 años</strong>. *
+                  </span>
                 </label>
                 <div className="rm-check-row" style={{ cursor: "default" }}>
-                  <Checkbox checked={acceptedTerms} onCheckedChange={v => setAcceptedTerms(v === true)} />
+                  <Checkbox
+                    checked={acceptedTerms}
+                    onCheckedChange={(v) => setAcceptedTerms(v === true)}
+                  />
                   <span>
                     Acepto las{" "}
                     <button
                       type="button"
                       onClick={() => setTermsOpen(true)}
                       style={{
-                        background: "none", border: "none", padding: 0,
-                        color: "var(--gold-dark)", fontWeight: 500,
-                        textDecoration: "underline", cursor: "pointer",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        color: "var(--gold-dark)",
+                        fontWeight: 500,
+                        textDecoration: "underline",
+                        cursor: "pointer",
                         font: "inherit",
                       }}
                     >
@@ -2091,7 +2701,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   </span>
                 </div>
                 <label className="rm-check-row">
-                  <Checkbox checked={noContact} onCheckedChange={v => setNoContact(v === true)} />
+                  <Checkbox checked={noContact} onCheckedChange={(v) => setNoContact(v === true)} />
                   <span>No quiero recibir comunicaciones comerciales.</span>
                 </label>
               </div>
@@ -2100,7 +2710,15 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 Continuar al pago <ChevronRight size={16} />
               </button>
             </div>
-            <SummaryBar room={room} startAt={startAt} endAt={endAt} people={people} isOvernight={isOvernight} duration={pricingDuration} breakdown={breakdown} />
+            <SummaryBar
+              room={room}
+              startAt={startAt}
+              endAt={endAt}
+              people={people}
+              isOvernight={isOvernight}
+              duration={pricingDuration}
+              breakdown={breakdown}
+            />
 
             <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
               <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
@@ -2110,28 +2728,48 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 <div className="space-y-4 text-sm leading-relaxed text-muted-foreground">
                   <ul className="list-disc space-y-2 pl-5">
                     <li>Los jacuzzis se encontrarán vacíos para comprobar que estén limpios.</li>
-                    <li>Sólo se gestionan reservas a mayores de 18 años. No aceptamos permiso de tutor/padre/madre. Se solicitará DNI a partir de 21:00 a 09:00 (durante el día se solicitará si es necesario comprobar la edad).</li>
+                    <li>
+                      Sólo se gestionan reservas a mayores de 18 años. No aceptamos permiso de
+                      tutor/padre/madre. Se solicitará DNI a partir de 21:00 a 09:00 (durante el día
+                      se solicitará si es necesario comprobar la edad).
+                    </li>
                     <li>Prohibida la entrada de bebidas, cachimbas y decoraciones de fuera.</li>
                     <li>Nos reservamos el derecho de admisión.</li>
-                    <li>No se permiten faltas de respeto hacia otros clientes ni hacia el personal.</li>
-                    <li>El personal llamará por teléfono a la habitación cinco minutos antes de la hora de salida en reservas por horas y treinta minutos antes en reservas por noche completa.</li>
+                    <li>
+                      No se permiten faltas de respeto hacia otros clientes ni hacia el personal.
+                    </li>
+                    <li>
+                      El personal llamará por teléfono a la habitación cinco minutos antes de la
+                      hora de salida en reservas por horas y treinta minutos antes en reservas por
+                      noche completa.
+                    </li>
                   </ul>
 
                   <div>
                     <p className="font-semibold text-foreground">En caso de retraso:</p>
                     <ul className="mt-1 list-disc space-y-1 pl-5">
                       <li>Pasados 5 minutos, se cobrará una penalización de 10€.</li>
-                      <li>Cada 5 minutos adicionales, se cobrará otro recargo de 10€, sucesivamente, hasta realizar la salida.</li>
+                      <li>
+                        Cada 5 minutos adicionales, se cobrará otro recargo de 10€, sucesivamente,
+                        hasta realizar la salida.
+                      </li>
                     </ul>
                   </div>
 
-                  <p>Las reservas serán anuladas pasados 15 minutos desde la hora de entrada si el cliente no avisa. En caso de llegar con retraso, la hora de salida no varía y se cobrará el tiempo reservado.</p>
+                  <p>
+                    Las reservas serán anuladas pasados 15 minutos desde la hora de entrada si el
+                    cliente no avisa. En caso de llegar con retraso, la hora de salida no varía y se
+                    cobrará el tiempo reservado.
+                  </p>
 
                   <div>
                     <p className="font-semibold text-foreground">Opciones de cancelación:</p>
                     <ul className="mt-1 list-disc space-y-1 pl-5">
                       <li>Cambio de fecha, según disponibilidad.</li>
-                      <li>Si cancela dentro de las 48h previas a la reserva, pierde la reserva y el pago anticipado.</li>
+                      <li>
+                        Si cancela dentro de las 48h previas a la reserva, pierde la reserva y el
+                        pago anticipado.
+                      </li>
                       <li>En ningún caso se devuelve el importe abonado.</li>
                     </ul>
                   </div>
@@ -2140,7 +2778,10 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
 
                   <div>
                     <p className="font-semibold text-foreground">Grupos de 3 personas:</p>
-                    <p className="mt-1">Será necesario dejar una fianza entre 50€ y 100€ en efectivo según valoración del establecimiento.</p>
+                    <p className="mt-1">
+                      Será necesario dejar una fianza entre 50€ y 100€ en efectivo según valoración
+                      del establecimiento.
+                    </p>
                   </div>
                 </div>
               </DialogContent>
@@ -2153,8 +2794,16 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
           <div className="rm-layout">
             <div className="rm-card">
               <h2 className="rm-serif">Pago del depósito</h2>
-              <p style={{ fontSize: 14, color: "var(--ink-soft)", marginBottom: 24, lineHeight: 1.65 }}>
-                Para confirmar tu reserva solo necesitas pagar el <strong>30%</strong> ahora. El resto lo pagas en el hotel al llegar.
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "var(--ink-soft)",
+                  marginBottom: 24,
+                  lineHeight: 1.65,
+                }}
+              >
+                Para confirmar tu reserva solo necesitas pagar el <strong>30%</strong> ahora. El
+                resto lo pagas en el hotel al llegar.
               </p>
 
               <div className="rm-payment-box">
@@ -2164,7 +2813,10 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 </div>
                 {promo && discountAmount > 0 && (
                   <div className="rm-payment-row">
-                    <span>Descuento {promo.code}{!promo.debug && " (habitación)"}</span>
+                    <span>
+                      Descuento {promo.code}
+                      {!promo.debug && " (habitación)"}
+                    </span>
                     <span className="rm-payment-row-val" style={{ color: "var(--gold-dark)" }}>
                       −{eur(discountAmount)} (antes {eur(breakdown.total)})
                     </span>
@@ -2172,7 +2824,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 )}
                 <div className="rm-payment-row">
                   <span>A pagar en el hotel</span>
-                  <span className="rm-payment-row-val">{eur(Math.max(0, payableTotal - depositAmount))}</span>
+                  <span className="rm-payment-row-val">
+                    {eur(Math.max(0, payableTotal - depositAmount))}
+                  </span>
                 </div>
                 <div className="rm-payment-highlight">
                   <span style={{ fontSize: 14 }}>Depósito ahora (30%)</span>
@@ -2186,19 +2840,38 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   <label className="rm-label">Código de descuento</label>
                   <Input
                     value={discountInput}
-                    onChange={e => setDiscountInput(e.target.value)}
+                    onChange={(e) => setDiscountInput(e.target.value)}
                     placeholder="Introduce tu código"
-                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyDiscount(); } }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        applyDiscount();
+                      }
+                    }}
                   />
                 </div>
-                <Button type="button" variant="outline" onClick={applyDiscount}>Aplicar</Button>
+                <Button type="button" variant="outline" onClick={applyDiscount}>
+                  Aplicar
+                </Button>
               </div>
 
-              <button className="rm-btn-primary" style={{ display: "flex" }} onClick={createReservation} disabled={paying}>
+              <button
+                className="rm-btn-primary"
+                style={{ display: "flex" }}
+                onClick={createReservation}
+                disabled={paying}
+              >
                 {paying ? "Redirigiendo al TPV…" : `Pagar ${eur(depositAmount)} con tarjeta`}
               </button>
 
-              <p style={{ fontSize: 11, color: "var(--ink-soft)", textAlign: "center", marginTop: 10 }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--ink-soft)",
+                  textAlign: "center",
+                  marginTop: 10,
+                }}
+              >
                 Pago seguro procesado por Redsys · Redirección al TPV de tu banco
               </p>
 
@@ -2207,9 +2880,25 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                   through the card flow on the public web. */}
               {!isOvernight && pricingDuration <= 180 && (
                 <>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 16px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      margin: "22px 0 16px",
+                    }}
+                  >
                     <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                    <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-soft)" }}>o</span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "var(--ink-soft)",
+                      }}
+                    >
+                      o
+                    </span>
                     <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
                   </div>
 
@@ -2218,37 +2907,70 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                     onClick={reserveViaWhatsApp}
                     disabled={paying}
                     style={{
-                      width: "100%", height: 52, borderRadius: 10, border: "none",
-                      background: "#25D366", color: "#fff", cursor: paying ? "not-allowed" : "pointer",
-                      fontSize: 14, fontWeight: 500, letterSpacing: "0.04em",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                      fontFamily: "'Noto Sans', sans-serif", opacity: paying ? 0.5 : 1,
+                      width: "100%",
+                      height: 52,
+                      borderRadius: 10,
+                      border: "none",
+                      background: "#25D366",
+                      color: "#fff",
+                      cursor: paying ? "not-allowed" : "pointer",
+                      fontSize: 14,
+                      fontWeight: 500,
+                      letterSpacing: "0.04em",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      fontFamily: "'Noto Sans', sans-serif",
+                      opacity: paying ? 0.5 : 1,
                       transition: "filter 0.2s",
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.filter = "brightness(0.93)")}
-                    onMouseLeave={e => (e.currentTarget.style.filter = "none")}
+                    onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(0.93)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
                   >
                     <MessageCircle size={18} /> Reservar por WhatsApp (sin pago online)
                   </button>
 
-                  <p style={{ fontSize: 11, color: "var(--ink-soft)", textAlign: "center", marginTop: 10 }}>
-                    Te abriremos un chat con los datos de tu reserva. Sin pago con tarjeta · Confirmación con recepción
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "var(--ink-soft)",
+                      textAlign: "center",
+                      marginTop: 10,
+                    }}
+                  >
+                    Te abriremos un chat con los datos de tu reserva. Sin pago con tarjeta ·
+                    Confirmación con recepción
                   </p>
                 </>
               )}
             </div>
-            <SummaryBar room={room} startAt={startAt} endAt={endAt} people={people} isOvernight={isOvernight} duration={pricingDuration} breakdown={breakdown} />
+            <SummaryBar
+              room={room}
+              startAt={startAt}
+              endAt={endAt}
+              people={people}
+              isOvernight={isOvernight}
+              duration={pricingDuration}
+              breakdown={breakdown}
+            />
           </div>
         )}
 
         {/* ── STEP 5: DONE ── */}
         {step === "done" && (
           <div className="rm-done">
-            <div className="rm-done-icon"><CheckCircle2 size={32} /></div>
-            <h2 className="rm-serif">¡Reserva<br />confirmada!</h2>
+            <div className="rm-done-icon">
+              <CheckCircle2 size={32} />
+            </div>
+            <h2 className="rm-serif">
+              ¡Reserva
+              <br />
+              confirmada!
+            </h2>
             <p>
-              Te hemos enviado un email de confirmación a <strong>{customerEmail}</strong> con todos los detalles.
-              Si no lo encuentras, revisa la carpeta de spam.
+              Te hemos enviado un email de confirmación a <strong>{customerEmail}</strong> con todos
+              los detalles. Si no lo encuentras, revisa la carpeta de spam.
             </p>
             <p className="rm-done-ref">Referencia: {reservationId?.slice(0, 8)?.toUpperCase()}</p>
             <div style={{ marginTop: 32 }}>
@@ -2256,10 +2978,17 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                 className="rm-btn-primary"
                 style={{ maxWidth: 280, margin: "0 auto" }}
                 onClick={() => {
-                  setStep("search"); setRoom(null); setExtraQty({}); setDecoMessages({});
-                  setDiscountInput(""); setPromo(null);
-                  setReservationId(null); setAdult(false);
-                  setCustomerName(""); setCustomerEmail(""); setCustomerPhone("");
+                  setStep("search");
+                  setRoom(null);
+                  setExtraQty({});
+                  setDecoMessages({});
+                  setDiscountInput("");
+                  setPromo(null);
+                  setReservationId(null);
+                  setAdult(false);
+                  setCustomerName("");
+                  setCustomerEmail("");
+                  setCustomerPhone("");
                 }}
               >
                 Hacer otra reserva
@@ -2269,53 +2998,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
         )}
       </main>
 
-      <footer className="rm-footer">
-        <div className="rm-footer-inner">
-          <div>
-            <img className="rm-footer-logo" src="/brand/rooms-madrid-horizontal-blanco.svg" alt="Rooms Madrid" />
-            <p className="rm-footer-about">
-              Hotel para parejas en Madrid, único en su clase. Centramos nuestros esfuerzos
-              en tu comodidad y discreción. Suites diseñadas para vuestro disfrute, solo +18.
-            </p>
-          </div>
+      <SiteFooter />
 
-          <div className="rm-footer-col">
-            <h4>Contacto</h4>
-            {BUILDINGS.map(b => (
-              <p key={b.value}>
-                {b.label.replace("RM ", "")}:{" "}
-                <a href={CONTACTS[b.value]?.phones[0]?.href}>{CONTACTS[b.value]?.phones[0]?.number}</a>
-              </p>
-            ))}
-            <p><a href="mailto:reservas@roomsmadrid.es">reservas@roomsmadrid.es</a></p>
-          </div>
-
-          <div className="rm-footer-col">
-            <h4>Síguenos</h4>
-            <div className="rm-footer-social">
-              <a href="https://www.instagram.com/rooms_madrid/" target="_blank" rel="nofollow noopener" aria-label="Instagram">
-                <img src="/brand/icons/icon-ig.png" alt="Instagram" loading="lazy" />
-              </a>
-              <a href="https://www.youtube.com/channel/UCjwTmW2N9wQN53ugeETpdvg" target="_blank" rel="nofollow noopener" aria-label="YouTube">
-                <img src="/brand/icons/icon-youtube.png" alt="YouTube" loading="lazy" />
-              </a>
-              <a href="https://www.tiktok.com/@rooms.madrid" target="_blank" rel="nofollow noopener" aria-label="TikTok">
-                <img src="/brand/icons/icon-tiktok.png" alt="TikTok" loading="lazy" />
-              </a>
-            </div>
-            <h4>Información</h4>
-            <p><a href="https://www.roomsmadrid.es/condiciones-de-reserva" target="_blank" rel="nofollow noopener">Condiciones de reserva</a></p>
-            <p><a href="https://www.roomsmadrid.es/politica-de-privacidad" target="_blank" rel="nofollow noopener">Política de privacidad</a></p>
-            <p><a href="https://www.roomsmadrid.es/politica-de-cookies" target="_blank" rel="nofollow noopener">Política de cookies</a></p>
-            <p><a href="https://www.roomsmadrid.es/aviso-legal" target="_blank" rel="nofollow noopener">Aviso legal</a></p>
-          </div>
-        </div>
-
-        <div className="rm-footer-bottom">
-          <div>© Rooms Madrid · Solo +18 · Bebe con responsabilidad</div>
-          <div>Pago: <strong>30% online</strong>, resto en el hotel · Confirmación inmediata por email</div>
-        </div>
-      </footer>
+      <CookieConsent />
     </div>
   );
 }
@@ -2324,7 +3009,13 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
 // Summary sidebar
 // ─────────────────────────────────────────────
 function SummaryBar({
-  room, startAt, endAt, people, isOvernight, duration, breakdown,
+  room,
+  startAt,
+  endAt,
+  people,
+  isOvernight,
+  duration,
+  breakdown,
 }: {
   room: RoomLite;
   startAt: Date | null;
@@ -2338,25 +3029,39 @@ function SummaryBar({
     <div className="rm-summary">
       <img src={getRoomImage(room)} alt="" className="rm-summary-room-img" />
       <div className="rm-summary-label">Tu habitación</div>
-      <div className="rm-summary-name rm-serif">{room.name} · RM {room.building}</div>
+      <div className="rm-summary-name rm-serif">
+        {room.name} · RM {room.building}
+      </div>
 
       <hr className="rm-summary-divider" />
 
       <div className="rm-summary-row">
         <span>Entrada</span>
         <span className="rm-summary-row-val">
-          {startAt?.toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+          {startAt?.toLocaleString("es-ES", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </span>
       </div>
       <div className="rm-summary-row">
         <span>Salida</span>
         <span className="rm-summary-row-val">
-          {endAt?.toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+          {endAt?.toLocaleString("es-ES", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </span>
       </div>
       <div className="rm-summary-row">
         <span>Duración</span>
-        <span className="rm-summary-row-val">{isOvernight ? "Noche completa" : DURATION_LABELS[duration]}</span>
+        <span className="rm-summary-row-val">
+          {isOvernight ? "Noche completa" : DURATION_LABELS[duration]}
+        </span>
       </div>
       <div className="rm-summary-row">
         <span>Personas</span>
@@ -2379,7 +3084,9 @@ function SummaryBar({
           {breakdown.dynamicSurcharge > 0 && (
             <div className="rm-summary-row">
               <span>Recargo</span>
-              <span className="rm-summary-row-val" style={{ color: "var(--gold-light)" }}>{eur(breakdown.dynamicSurcharge)}</span>
+              <span className="rm-summary-row-val" style={{ color: "var(--gold-light)" }}>
+                {eur(breakdown.dynamicSurcharge)}
+              </span>
             </div>
           )}
           {breakdown.extrasTotal > 0 && (
@@ -2394,7 +3101,8 @@ function SummaryBar({
             <span className="rm-summary-total-val rm-serif">{eur(breakdown.total)}</span>
           </div>
           <div className="rm-summary-deposit">
-            Depósito 30% online: <strong style={{ color: "var(--gold-light)" }}>{eur(breakdown.total * 0.3)}</strong>
+            Depósito 30% online:{" "}
+            <strong style={{ color: "var(--gold-light)" }}>{eur(breakdown.total * 0.3)}</strong>
           </div>
         </>
       )}
