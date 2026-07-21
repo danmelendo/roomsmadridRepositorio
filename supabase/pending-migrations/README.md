@@ -12,7 +12,12 @@ inactivos hasta que se dé el visto bueno.
 4. Aplicar con `supabase db push` (o el flujo de despliegue habitual).
 
 ## Pendientes actuales
-- `20260701_add_ventas_rooms_miami_bali_cairo.sql` — alta de Miami, Bali Deluxe
-  y Cairo en RM Ventas (habitaciones + `rate_groups` + tarifas). Ver también los
-  `TODO` gemelos en el frontend: `src/lib/roomSlugs.ts` (enlaces) y
-  `src/routes/reservar.tsx` (fotos, descripciones y flags pantalla/cubo LED/columpio).
+- `20260701_add_ventas_rooms_miami_bali_cairo.sql` — **solo queda Bali Deluxe**.
+  El Cairo y Miami ya se dieron de alta (con tarifas independientes copiadas de
+  Music/Empire) en la migración aplicada
+  `supabase/migrations/20260717120000_add_ventas_rooms_cairo_miami.sql`, con
+  `active = false` (visibles en la agenda interna, ocultas en la web pública
+  hasta que el personal las active y lleguen las fotos).
+  Para Bali Deluxe siguen aplicando los `TODO` gemelos del frontend:
+  `src/lib/roomSlugs.ts` (enlaces) y `src/routes/reservar.tsx`
+  (fotos, descripciones y flags pantalla/cubo LED/columpio).

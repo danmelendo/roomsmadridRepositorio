@@ -30,6 +30,7 @@ import {
   Phone,
   ChevronRight,
   Tv,
+  Armchair,
   Moon,
   Clock,
   Star,
@@ -114,22 +115,29 @@ const ROOM_IMAGES_MAP: Record<string, Record<string, string[]>> = {
       "/imagenes/Ventas/Route 66/JacuzziRuta66.jpeg",
       "/imagenes/Ventas/Route 66/Ruta66_tantra.jpeg",
     ],
-    // ───────────────────────────────────────────────────────────────
-    // TODO (habitaciones nuevas RM Ventas): descomentar cuando estén
-    // disponibles y subir las fotos reales a /public/imagenes/Ventas/<Sala>/.
-    // Las rutas de abajo son marcadores de posición: sustituir por los
-    // nombres de archivo reales. Sin fotos, la habitación cae al
-    // ROOM_IMAGE_FALLBACK genérico (ver getRoomImages).
-    // "Miami": [
-    //   "/imagenes/Ventas/Miami/miami-1.jpeg",
-    // ],
-    // "Bali Deluxe": [
-    //   "/imagenes/Ventas/Bali Deluxe/bali-deluxe-1.jpeg",
-    // ],
-    // "Cairo": [
-    //   "/imagenes/Ventas/Cairo/cairo-1.jpeg",
-    // ],
-    // ───────────────────────────────────────────────────────────────
+    "El Cairo": [
+      "/imagenes/Ventas/El Cairo/Cairo1.jpeg",
+      "/imagenes/Ventas/El Cairo/Cairo2.jpeg",
+      "/imagenes/Ventas/El Cairo/Cairo3.jpeg",
+      "/imagenes/Ventas/El Cairo/Cairo4.jpeg",
+      "/imagenes/Ventas/El Cairo/Cairo5.jpeg",
+      "/imagenes/Ventas/El Cairo/Cairo6.jpeg",
+      "/imagenes/Ventas/El Cairo/Cairo7.jpeg",
+      "/imagenes/Ventas/El Cairo/Cairo8.jpeg",
+      "/imagenes/Ventas/El Cairo/Cairo9.jpeg",
+      "/imagenes/Ventas/El Cairo/CairoDeco.jpeg",
+    ],
+    Miami: [
+      "/imagenes/Ventas/Miami/Miami1.jpeg",
+      "/imagenes/Ventas/Miami/Miami2.jpeg",
+      "/imagenes/Ventas/Miami/Miami3.jpeg",
+      "/imagenes/Ventas/Miami/Miami4.jpeg",
+      "/imagenes/Ventas/Miami/Miami5.jpeg",
+      "/imagenes/Ventas/Miami/Miami6.jpeg",
+      "/imagenes/Ventas/Miami/Miami7.jpeg",
+      "/imagenes/Ventas/Miami/Miami8.jpeg",
+    ],
+    // (Bali Deluxe sigue pendiente de alta en BD.)
   },
   america: {
     Dubai: ["/imagenes/America/Dubai/Dubainueva.jpeg"],
@@ -208,12 +216,8 @@ const ROOM_DESCRIPTIONS: Record<string, Record<string, string>> = {
     Hollywood: "Sed los protagonistas de vuestra propia película sin censura.",
     Music: "Luces de fiesta, ritmo y burbujas para subir el volumen de la pasión.",
     "Route 66": "Una escapada salvaje por la ruta del deseo bajo un cielo de fuego.",
-    // TODO (habitaciones nuevas RM Ventas): descomentar al lanzarlas y
-    // ajustar el copy sugerente. Sin entrada aquí, getRoomDescription usa
-    // un texto genérico ("Habitación temática para N personas.").
-    // "Miami": "Brisa de neón, palmeras y noche eterna: bienvenidos a Miami.",
-    // "Bali Deluxe": "Un templo del placer entre seda, orquídeas y agua tibia.",
-    // "Cairo": "Misterio milenario y lujo dorado para una noche de faraones.",
+    "El Cairo": "Oro, pirámides y misterio milenario para una noche de faraones.",
+    Miami: "Neón rosa, palmeras y skyline: la noche eterna de South Beach.",
   },
   bernabeu: {
     Grey: "Penumbra, neón y juego: dejaos llevar sin reglas.",
@@ -240,29 +244,32 @@ function getRoomDescription(r: { name: string; building: string; capacity: numbe
   return `Habitación temática para ${r.capacity} personas.`;
 }
 
-// Rooms that feature a screen. Shown as a single "Pantalla disponible" badge.
-// TODO (habitaciones nuevas RM Ventas): cuando se definan las prestaciones de
-// Miami / Bali Deluxe / Cairo, añadir aquí las que tengan PANTALLA. Ejemplo:
-//   ventas: ["Music", "Grey", "Miami", "Cairo"],
+// Rooms that feature a screen. Shown as a single "Pantalla LED" badge.
+// También cambia el rótulo del mensaje de decoración a "Mensaje en la pantalla"
+// (ver messageSurfaceLabel).
+// OJO: esto es la PANTALLA de proyección de contenido/mensajes, NO una simple TV
+// de pantalla plana. El Cairo y Miami tienen TV plana pero NO entran aquí.
 const ROOMS_WITH_SCREEN: Record<string, string[]> = {
   america: ["Dubai", "New York"],
   ventas: ["Music", "Grey"],
   bernabeu: ["Safari"],
 };
 
-// TODO (habitaciones nuevas RM Ventas): añadir aquí las que tengan CUBO LED.
-// Ejemplo: ventas: ["Route 66", "Bali Deluxe"],
+// Salas con CUBO LED. Además de mostrar el badge, habilita el extra "cubo LED"
+// (ver extraAvailableForRoom). El Cairo y Miami NO lo tienen: el cliente
+// confirmó que solo cuentan con columpio y TV de pantalla plana.
 const ROOMS_WITH_LED_CUBE: Record<string, string[]> = {
   ventas: ["Route 66"],
   bernabeu: ["Grey"],
 };
 
-// TODO (habitaciones nuevas RM Ventas): añadir aquí las que admitan COLUMPIO.
-// Debe ir en línea con el flag `rooms.has_swing` de la BD. Ejemplo:
-//   ventas: ["Hollywood", "Empire State", "Music", "Grey", "Bali Deluxe"],
+// Salas que admiten el extra COLUMPIO. Habilita el extra en la lista
+// (ver extraAvailableForRoom) Y muestra el badge "Columpio".
+// Debe ir en línea con el flag `rooms.has_swing` de la BD.
+// El Cairo y Miami: columpio confirmado por el cliente (jul-2026).
 const ROOMS_WITH_SWING_EXTRA: Record<string, string[]> = {
   america: ["Dubai", "Grey", "Tu y yo"],
-  ventas: ["Hollywood", "Empire State", "Music", "Grey"],
+  ventas: ["Hollywood", "Empire State", "Music", "Grey", "El Cairo", "Miami"],
   bernabeu: ["Tokyo", "Paris", "Grey"],
 };
 
@@ -2156,13 +2163,19 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                               {hasScreen(r) && (
                                 <span className="rm-badge">
                                   <Tv size={11} />
-                                  Pantalla disponible
+                                  Pantalla LED
                                 </span>
                               )}
                               {hasLedCube(r) && (
                                 <span className="rm-badge">
                                   <Tv size={11} />
                                   Cubo LED
+                                </span>
+                              )}
+                              {allowsSwingExtra(r) && (
+                                <span className="rm-badge">
+                                  <Armchair size={11} />
+                                  Columpio
                                 </span>
                               )}
                             </div>
@@ -2415,13 +2428,19 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                     {hasScreen(room) && (
                       <span className="rm-badge">
                         <Tv size={11} />
-                        Pantalla disponible
+                        Pantalla LED
                       </span>
                     )}
                     {hasLedCube(room) && (
                       <span className="rm-badge">
                         <Tv size={11} />
                         Cubo LED
+                      </span>
+                    )}
+                    {allowsSwingExtra(room) && (
+                      <span className="rm-badge">
+                        <Armchair size={11} />
+                        Columpio
                       </span>
                     )}
                   </div>

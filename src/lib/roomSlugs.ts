@@ -22,20 +22,10 @@ export const ROOM_SLUGS: RoomSlugEntry[] = [
   { slug: "musicventas", building: "ventas", buildingLabel: "RM Ventas", name: "Music" },
   { slug: "route66ventas", building: "ventas", buildingLabel: "RM Ventas", name: "Route 66" },
   { slug: "empirestateventas", building: "ventas", buildingLabel: "RM Ventas", name: "Empire State" },
+  { slug: "elcairoventas", building: "ventas", buildingLabel: "RM Ventas", name: "El Cairo" },
+  { slug: "miamiventas", building: "ventas", buildingLabel: "RM Ventas", name: "Miami" },
 
-  // ───────────────────────────────────────────────────────────────
-  // TODO (habitaciones nuevas RM Ventas — Miami, Bali Deluxe, Cairo):
-  // Descomentar cuando las 3 habitaciones estén realmente disponibles y
-  // dadas de alta en la BD (ver supabase/pending-migrations/). El `name`
-  // debe coincidir EXACTAMENTE con el `rooms.name` de la BD.
-  //
-  // Slugs con el patrón homogéneo <nombre>ventas (igual que el resto de
-  // Ventas: "hollywoodventas", etc.). Enlaces resultantes:
-  //   /reservar-miamiventas · /reservar-balideluxeventas · /reservar-cairoventas
-  // { slug: "miamiventas", building: "ventas", buildingLabel: "RM Ventas", name: "Miami" },
-  // { slug: "balideluxeventas", building: "ventas", buildingLabel: "RM Ventas", name: "Bali Deluxe" },
-  // { slug: "cairoventas", building: "ventas", buildingLabel: "RM Ventas", name: "Cairo" },
-  // ───────────────────────────────────────────────────────────────
+  // (Bali Deluxe sigue pendiente de alta en BD: ver supabase/pending-migrations/.)
 
   // RM Bernabéu
   { slug: "greybernabeu", building: "bernabeu", buildingLabel: "RM Bernabéu", name: "Grey" },

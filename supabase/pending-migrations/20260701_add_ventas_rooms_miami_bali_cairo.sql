@@ -1,10 +1,15 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- PENDIENTE / TODO — Alta de 3 habitaciones nuevas en RM VENTAS
---   · Miami
---   · Bali Deluxe
---   · Cairo
+-- PENDIENTE / TODO — Alta de habitaciones nuevas en RM VENTAS
+--   · Bali Deluxe   (ÚNICA que sigue pendiente)
+--   · ~~Miami~~     -> YA APLICADA en migrations/20260717120000_add_ventas_rooms_cairo_miami.sql
+--   · ~~Cairo~~     -> idem (como "El Cairo")
 --
--- Estado: NO APLICAR TODAVÍA. Estas salas aún no están disponibles.
+-- Miami y El Cairo se dieron de alta con tarifas INDEPENDIENTES (rate_group
+-- propio por sala, copiando precios de Music/Empire) y active = false. Este
+-- fichero se conserva solo como plantilla para Bali Deluxe; ignora los bloques
+-- de Miami/Cairo de abajo o bórralos al activar Bali Deluxe.
+--
+-- Estado: NO APLICAR TODAVÍA. Bali Deluxe aún no está disponible.
 --
 -- Este fichero vive a propósito en `supabase/pending-migrations/` (NO en
 -- `supabase/migrations/`) para que el CLI de Supabase NO lo ejecute ni lo
