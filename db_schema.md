@@ -44,6 +44,8 @@ Grupo de tarifas compartible entre varias salas.
   por el nombre del grupo, que puede haber cambiado. Ver `20260717121000`.
 - `El Cairo` y `Miami` añadidos en `20260717120000` + `20260717121000` con tarifas
   INDEPENDIENTES (copiadas de `Music/Empire`).
+- `Bali Deluxe` añadido en `20260813120000` con tarifa INDEPENDIENTE copiada de
+  `Grey` (sala premium; `active=false` hasta tener fotos).
 - ⚠️ Los **precios reales en prod también se editaron a mano** desde el panel de
   Tarifas y difieren de los valores de `20260506170000_update_tarifas.sql`
   (p.ej. Music/Empire 60min = 45 €, no 43/38). El panel es la fuente de verdad.

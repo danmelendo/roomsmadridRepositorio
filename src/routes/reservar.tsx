@@ -31,6 +31,8 @@ import {
   ChevronRight,
   Tv,
   Armchair,
+  Waves,
+  Sparkles,
   Moon,
   Clock,
   Star,
@@ -137,7 +139,17 @@ const ROOM_IMAGES_MAP: Record<string, Record<string, string[]>> = {
       "/imagenes/Ventas/Miami/Miami7.jpeg",
       "/imagenes/Ventas/Miami/Miami8.jpeg",
     ],
-    // (Bali Deluxe sigue pendiente de alta en BD.)
+    "Bali Deluxe": [
+      "/imagenes/Ventas/Bali Deluxe/Bali1.jpeg",
+      "/imagenes/Ventas/Bali Deluxe/Bali2.jpeg",
+      "/imagenes/Ventas/Bali Deluxe/Bali3.jpeg",
+      "/imagenes/Ventas/Bali Deluxe/Bali4.jpeg",
+      "/imagenes/Ventas/Bali Deluxe/Bali5.jpeg",
+      "/imagenes/Ventas/Bali Deluxe/Bali6.jpeg",
+      "/imagenes/Ventas/Bali Deluxe/Bali7.jpeg",
+      "/imagenes/Ventas/Bali Deluxe/Bali8.jpeg",
+      "/imagenes/Ventas/Bali Deluxe/Bali9.jpeg",
+    ],
   },
   america: {
     Dubai: ["/imagenes/America/Dubai/Dubainueva.jpeg"],
@@ -218,6 +230,7 @@ const ROOM_DESCRIPTIONS: Record<string, Record<string, string>> = {
     "Route 66": "Una escapada salvaje por la ruta del deseo bajo un cielo de fuego.",
     "El Cairo": "Oro, pirámides y misterio milenario para una noche de faraones.",
     Miami: "Neón rosa, palmeras y skyline: la noche eterna de South Beach.",
+    "Bali Deluxe": "Un paraíso privado con piscina climatizada para perderos a solas.",
   },
   bernabeu: {
     Grey: "Penumbra, neón y juego: dejaos llevar sin reglas.",
@@ -269,12 +282,32 @@ const ROOMS_WITH_LED_CUBE: Record<string, string[]> = {
 // El Cairo y Miami: columpio confirmado por el cliente (jul-2026).
 const ROOMS_WITH_SWING_EXTRA: Record<string, string[]> = {
   america: ["Dubai", "Grey", "Tu y yo"],
-  ventas: ["Hollywood", "Empire State", "Music", "Grey", "El Cairo", "Miami"],
+  ventas: ["Hollywood", "Empire State", "Music", "Grey", "El Cairo", "Miami", "Bali Deluxe"],
   bernabeu: ["Tokyo", "Paris", "Grey"],
+};
+
+// Badge-only (no extra asociado): salas con PISCINA CLIMATIZADA. De momento solo
+// Bali Deluxe.
+const ROOMS_WITH_POOL: Record<string, string[]> = {
+  ventas: ["Bali Deluxe"],
+};
+
+// Badge-only (no extra asociado): salas con BARRA de POLE DANCE. De momento solo
+// Bali Deluxe.
+const ROOMS_WITH_POLE: Record<string, string[]> = {
+  ventas: ["Bali Deluxe"],
 };
 
 function hasScreen(r: { name: string; building: string }): boolean {
   return ROOMS_WITH_SCREEN[buildingKey(r.building)]?.includes(r.name) ?? false;
+}
+
+function hasPool(r: { name: string; building: string }): boolean {
+  return ROOMS_WITH_POOL[buildingKey(r.building)]?.includes(r.name) ?? false;
+}
+
+function hasPole(r: { name: string; building: string }): boolean {
+  return ROOMS_WITH_POLE[buildingKey(r.building)]?.includes(r.name) ?? false;
 }
 
 function hasLedCube(r: { name: string; building: string }): boolean {
@@ -2178,6 +2211,18 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                                   Columpio
                                 </span>
                               )}
+                              {hasPool(r) && (
+                                <span className="rm-badge">
+                                  <Waves size={11} />
+                                  Piscina Climatizada
+                                </span>
+                              )}
+                              {hasPole(r) && (
+                                <span className="rm-badge">
+                                  <Sparkles size={11} />
+                                  Barra Pole Dance
+                                </span>
+                              )}
                             </div>
                             <div className="rm-room-desc">{getRoomDescription(r)}</div>
                           </div>
@@ -2441,6 +2486,18 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                       <span className="rm-badge">
                         <Armchair size={11} />
                         Columpio
+                      </span>
+                    )}
+                    {hasPool(room) && (
+                      <span className="rm-badge">
+                        <Waves size={11} />
+                        Piscina Climatizada
+                      </span>
+                    )}
+                    {hasPole(room) && (
+                      <span className="rm-badge">
+                        <Sparkles size={11} />
+                        Barra Pole Dance
                       </span>
                     )}
                   </div>

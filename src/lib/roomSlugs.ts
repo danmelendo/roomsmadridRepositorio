@@ -25,7 +25,7 @@ export const ROOM_SLUGS: RoomSlugEntry[] = [
   { slug: "elcairoventas", building: "ventas", buildingLabel: "RM Ventas", name: "El Cairo" },
   { slug: "miamiventas", building: "ventas", buildingLabel: "RM Ventas", name: "Miami" },
 
-  // (Bali Deluxe sigue pendiente de alta en BD: ver supabase/pending-migrations/.)
+  { slug: "balideluxeventas", building: "ventas", buildingLabel: "RM Ventas", name: "Bali Deluxe" },
 
   // RM Bernabéu
   { slug: "greybernabeu", building: "bernabeu", buildingLabel: "RM Bernabéu", name: "Grey" },
