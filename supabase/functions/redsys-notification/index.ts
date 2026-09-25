@@ -79,6 +79,20 @@ function normaliseB64(s: string) {
   return s.replace(/[-_]/g, (c) => (c === "-" ? "+" : "/")).replace(/=*$/, "");
 }
 
+/**
+ * Texto útil de un error de `functions.invoke`: para un FunctionsHttpError el
+ * mensaje genérico no dice nada ("Edge Function returned a non-2xx status
+ * code"); el detalle real está en el body de `error.context` (Response).
+ */
+async function describeInvokeError(err: unknown): Promise<string> {
+  const e = err as { message?: string; context?: Response };
+  let detail = "";
+  try {
+    if (e.context && typeof e.context.text === "function") detail = (await e.context.text()).slice(0, 500);
+  } catch { /* body no legible */ }
+  return `${e.message ?? String(err)}${detail ? ` — ${detail}` : ""}`;
+}
+
 Deno.serve(async (req) => {
   // Redsys sends application/x-www-form-urlencoded
   let body: string;
@@ -173,13 +187,22 @@ Deno.serve(async (req) => {
         if (redeemErr) console.warn("redsys-notification: failed to redeem promo code", redeemErr);
       }
 
-      // Trigger confirmation email
-      try {
-        await supabase.functions.invoke("send-reservation-confirmation", {
-          body: { reservation_id: reservation.id },
-        });
-      } catch (e) {
-        console.warn("redsys-notification: email send failed", e);
+      // Trigger confirmation email. `functions.invoke` NO lanza cuando la
+      // función responde 500: devuelve { error } (FunctionsHttpError) y hay que
+      // leerlo explícitamente; si no, el fallo de envío es invisible (incidente
+      // SMTP 15/09/2026). El error queda también en
+      // reservations.confirmation_email_error para reenviarlo después.
+      const { data: mailData, error: mailErr } = await supabase.functions.invoke(
+        "send-reservation-confirmation",
+        { body: { reservation_id: reservation.id } },
+      );
+      if (mailErr) {
+        console.error(
+          "redsys-notification: email send failed for order", order,
+          await describeInvokeError(mailErr),
+        );
+      } else {
+        console.log("redsys-notification: email result for order", order, JSON.stringify(mailData));
       }
     }
   } else {

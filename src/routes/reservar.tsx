@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -298,6 +298,13 @@ const ROOMS_WITH_POLE: Record<string, string[]> = {
   ventas: ["Bali Deluxe"],
 };
 
+// Salas que admiten el extra CAMILLA DE MASAJES (15 €). Habilita el extra en la
+// lista (ver extraAvailableForRoom); no lleva badge. De momento solo Bali
+// Deluxe. Alta del extra en BD: migración 20260916120000.
+const ROOMS_WITH_MASSAGE_TABLE: Record<string, string[]> = {
+  ventas: ["Bali Deluxe"],
+};
+
 function hasScreen(r: { name: string; building: string }): boolean {
   return ROOMS_WITH_SCREEN[buildingKey(r.building)]?.includes(r.name) ?? false;
 }
@@ -318,6 +325,65 @@ function allowsSwingExtra(r: { name: string; building: string }): boolean {
   return ROOMS_WITH_SWING_EXTRA[buildingKey(r.building)]?.includes(r.name) ?? false;
 }
 
+function allowsMassageTableExtra(r: { name: string; building: string }): boolean {
+  return ROOMS_WITH_MASSAGE_TABLE[buildingKey(r.building)]?.includes(r.name) ?? false;
+}
+
+// Special per-room booking conditions. When a room has an entry here, a notice
+// with these terms is shown BEFORE the visitor can start booking it, and they
+// must click "Acepto" to continue (see selectRoom / conditions Dialog).
+interface SpecialConditions {
+  title: string;
+  intro: string; // highlighted lead line
+  items: { label: string; text: string }[];
+  footer?: string;
+}
+
+const SPECIAL_BOOKING_CONDITIONS: Record<string, Record<string, SpecialConditions>> = {
+  ventas: {
+    "Bali Deluxe": {
+      title: "Condiciones de reserva — Habitación Bali",
+      intro: "MUY IMPORTANTE: leer las condiciones de reserva.",
+      items: [
+        {
+          label: "Fianza",
+          text: "Para reservar y acceder a la habitación BALI será necesario dejar una fianza, cuyo importe será informado previamente. La fianza será devuelta al finalizar la estancia, una vez comprobado el estado de la habitación y sus instalaciones.",
+        },
+        {
+          label: "Daños y desperfectos",
+          text: "Cualquier daño, rotura o desperfecto ocasionado durante la estancia en la piscina, mobiliario, decoración, equipamiento o instalaciones será responsabilidad de los huéspedes y deberá ser abonado.",
+        },
+        {
+          label: "Uso de la piscina",
+          text: "La piscina deberá utilizarse de forma responsable y respetando las normas de uso de la piscina disponibles en la habitación.",
+        },
+        {
+          label: "Mobiliario y equipamiento",
+          text: "No está permitido mover, desmontar, sacar de la habitación o manipular muebles, elementos decorativos o equipamiento sin autorización del establecimiento.",
+        },
+        {
+          label: "Limpieza extraordinaria",
+          text: "El establecimiento podrá cobrar los gastos derivados de una limpieza extraordinaria ocasionada por un uso inadecuado de la habitación o de la piscina.",
+        },
+        {
+          label: "Objetos del establecimiento",
+          text: "Cualquier objeto retirado, perdido o dañado durante la estancia podrá ser cargado al cliente.",
+        },
+        {
+          label: "Responsabilidad",
+          text: "La reserva y utilización de la habitación BALI implican la aceptación de estas condiciones y la responsabilidad sobre los posibles daños ocasionados durante la estancia.",
+        },
+      ],
+      footer:
+        "El establecimiento se reserva el derecho de cobrar los importes correspondientes por daños, desperfectos o gastos extraordinarios ocasionados durante la estancia.",
+    },
+  },
+};
+
+function specialConditionsFor(r: { name: string; building: string }): SpecialConditions | null {
+  return SPECIAL_BOOKING_CONDITIONS[buildingKey(r.building)]?.[r.name] ?? null;
+}
+
 function isSwingExtra(ex: ExtraLite): boolean {
   return /colump/i.test(ex.name);
 }
@@ -336,9 +402,14 @@ function isLedCubeExtra(ex: ExtraLite): boolean {
   return /cubo/i.test(ex.name) && /led/i.test(ex.name);
 }
 
+function isMassageTableExtra(ex: ExtraLite): boolean {
+  return /camilla/i.test(ex.name);
+}
+
 function extraAvailableForRoom(ex: ExtraLite, r: { name: string; building: string }): boolean {
   if (isSwingExtra(ex)) return allowsSwingExtra(r);
   if (isLedCubeExtra(ex)) return hasLedCube(r);
+  if (isMassageTableExtra(ex)) return allowsMassageTableExtra(r);
   return true;
 }
 
@@ -443,25 +514,22 @@ const CONTACTS: Record<
   { phones: { number: string; href: string }[]; email: string; address: string }
 > = {
   bernabeu: {
-    phones: [
-      { number: "910 076 100", href: "tel:+34910076100" },
-      { number: "685 066 656", href: "tel:+34685066656" },
-    ],
+    phones: [{ number: "605 472 600", href: "tel:+34605472600" }],
     email: "reservas@roomsmadrid.es",
     address: "Calle Infanta Mercedes, 9 · CP 28020 Madrid",
   },
   ventas: {
     phones: [
-      { number: "91 060 34 81", href: "tel:+34910603481" },
-      { number: "657 992 990", href: "tel:+34657992990" },
+      { number: "910 076 100", href: "tel:+34910076100" },
+      { number: "685 066 656", href: "tel:+34685066656" },
     ],
     email: "reservas@roomsmadrid.es",
     address: "Madrid",
   },
   america: {
     phones: [
-      { number: "605 472 600", href: "tel:+34605472600" },
-      { number: "605 472 600", href: "tel:+34605472600" },
+      { number: "910 603 481", href: "tel:+34910603481" },
+      { number: "657 992 990", href: "tel:+34657992990" },
     ],
     email: "reservas@roomsmadrid.es",
     address: "Av. América, 15 · CP 28028 Madrid",
@@ -1139,6 +1207,13 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
   const [room, setRoom] = useState<RoomLite | null>(null);
   const [withJacuzzi, setWithJacuzzi] = useState(false);
   const [expandedExtrasRoom, setExpandedExtrasRoom] = useState<string | null>(null);
+  // Special per-room booking conditions gate (e.g. Bali Deluxe): the room whose
+  // notice is currently open, and the ids of rooms whose notice the visitor has
+  // already accepted this session (so we don't nag on every re-entry).
+  const [conditionsRoom, setConditionsRoom] = useState<RoomLite | null>(null);
+  const [acceptedConditionRoomIds, setAcceptedConditionRoomIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   // extras (shared across rooms in search, then locked after select)
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
@@ -1270,6 +1345,52 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     return map;
   }, [rooms, rateHourly]);
 
+  // Duración mínima reservable por sala, DATA-DRIVEN desde `rate_hourly`: el
+  // tramo más corto que el grupo de tarifa tiene realmente con precio.
+  // Las filas existen para todos los tramos (60…360) pero las salas premium
+  // sólo tienen importe a partir de cierta duración (Bali Deluxe: 3 h). Sin
+  // esto, reservar 2 h daba base = 0 € — `pricing.ts` hace `?? 0` cuando la
+  // columna es null — y la reserva se creaba sin importe.
+  // Se exige precio en la columna que ESA sala va a usar: `always` → con
+  // jacuzzi, `none` → sin jacuzzi, `optional` → ambas (el cliente puede
+  // activarlo o no en el detalle).
+  const minDurationByRoom = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!rooms || !rateHourly) return map;
+    const rows = rateHourly as {
+      rate_group_id: string;
+      duration_min: number;
+      price_without_jacuzzi: number | null;
+      price_with_jacuzzi: number | null;
+    }[];
+    for (const r of rooms) {
+      if (!r.rate_group_id) continue;
+      const priced = rows.filter((row) => {
+        if (row.rate_group_id !== r.rate_group_id) return false;
+        if (!DURATIONS.includes(row.duration_min)) return false;
+        const needsWith = r.jacuzzi !== "none";
+        const needsWithout = r.jacuzzi !== "always";
+        if (needsWith && !(Number(row.price_with_jacuzzi) > 0)) return false;
+        if (needsWithout && !(Number(row.price_without_jacuzzi) > 0)) return false;
+        return true;
+      });
+      if (priced.length) map.set(r.id, Math.min(...priced.map((row) => row.duration_min)));
+    }
+    return map;
+  }, [rooms, rateHourly]);
+
+  // Una sala con duración mínima (Bali Deluxe: 3 h) nunca puede quedar
+  // seleccionada por debajo de ese tramo: subimos la búsqueda al mínimo en vez
+  // de dejar que la reserva se cree con 0 €. Red de seguridad para las rutas
+  // que no pasan por el listado (URL por sala, botón atrás del navegador).
+  useEffect(() => {
+    if (!room || isOvernight) return;
+    const min = minDurationByRoom.get(room.id);
+    if (min === undefined || pricingDuration >= min) return;
+    setDuration(min);
+    toast.info(`${room.name} tiene una reserva mínima de ${DURATION_LABELS[min] ?? `${min} min`}.`);
+  }, [room, isOvernight, pricingDuration, minDurationByRoom]);
+
   const { data: conflicts } = useQuery({
     queryKey: ["public-conflicts", startAt?.toISOString(), endAt?.toISOString()],
     enabled: !!startAt && !!endAt,
@@ -1396,7 +1517,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     }
   }, [didSearch, availableRooms.length]);
 
-  const selectRoom = (r: RoomLite) => {
+  // Actually enter the room's booking detail (assumes any special conditions
+  // have already been accepted).
+  const enterRoom = (r: RoomLite) => {
     setRoom(r);
     setWithJacuzzi(r.jacuzzi === "always");
     setExtraQty((current) => {
@@ -1409,6 +1532,26 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       );
     });
     setStep("room-detail");
+  };
+
+  const selectRoom = (r: RoomLite) => {
+    // Rooms with special booking conditions (e.g. Bali Deluxe) must show their
+    // notice and be explicitly accepted before the visitor can start booking.
+    if (specialConditionsFor(r) && !acceptedConditionRoomIds.has(r.id)) {
+      setConditionsRoom(r);
+      return;
+    }
+    enterRoom(r);
+  };
+
+  // "Acepto" on the special-conditions notice: remember the acceptance for this
+  // session and continue into the room's booking detail.
+  const acceptConditions = () => {
+    if (!conditionsRoom) return;
+    const r = conditionsRoom;
+    setAcceptedConditionRoomIds((prev) => new Set(prev).add(r.id));
+    setConditionsRoom(null);
+    enterRoom(r);
   };
 
   // Sync step changes into browser history so the back button works
@@ -1516,6 +1659,18 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     // has no overnight rate configured).
     if (isOvernight && breakdown.base <= 0) {
       toast.error("Esta habitación no tiene tarifa de noche completa configurada.");
+      return;
+    }
+    // Misma red para las reservas por horas: si el grupo de tarifa no tiene
+    // precio para este tramo (salas premium con duración mínima), la reserva se
+    // crearía con importe 0 € y el TPV cobraría 0. Mejor pararla aquí.
+    if (!isOvernight && breakdown.base <= 0) {
+      const min = room ? minDurationByRoom.get(room.id) : undefined;
+      toast.error(
+        min !== undefined
+          ? `${room?.name} tiene una reserva mínima de ${DURATION_LABELS[min] ?? `${min} min`}.`
+          : "Esta habitación no tiene tarifa configurada para esta duración.",
+      );
       return;
     }
     if (payingGuard.current) return;
@@ -1865,7 +2020,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
           showBack: step !== "search" && step !== "done",
           onBack: handleBack,
           phone: CONTACTS[building]?.phones[0] ?? {
-            number: "91 007 61 00",
+            number: "910 076 100",
             href: "tel:+34910076100",
           },
         }}
@@ -2108,7 +2263,17 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                     // Rooms flagged hourly-only are greyed out while the overnight
                     // option is active (they can only be booked by the hour).
                     const overnightBlocked = isOvernight && r.allows_overnight === false;
-                    const blocked = unavailable || overnightBlocked;
+                    // Salas con duración mínima (Bali Deluxe: 3 h): su grupo de
+                    // tarifa no tiene precio en los tramos cortos, así que
+                    // reservarlas por debajo del mínimo salía a 0 €.
+                    const minDuration = minDurationByRoom.get(r.id);
+                    const durationBlocked =
+                      !isOvernight && minDuration !== undefined && pricingDuration < minDuration;
+                    const minDurationLabel =
+                      minDuration === undefined
+                        ? ""
+                        : (DURATION_LABELS[minDuration] ?? `${minDuration} min`);
+                    const blocked = unavailable || overnightBlocked || durationBlocked;
                     const isExpanded = expandedExtrasRoom === r.id;
                     const roomExtras =
                       extras?.filter(
@@ -2170,6 +2335,20 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                                       </a>
                                     ))}
                                   </div>
+                                </>
+                              ) : durationBlocked ? (
+                                <>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                                    <span style={{ fontSize: 16 }}>🕑</span>
+                                    Reserva mínima de {minDurationLabel}
+                                  </div>
+                                  <button
+                                    className="rm-btn-select"
+                                    onClick={() => minDuration && setDuration(minDuration)}
+                                    style={{ fontSize: 12, padding: "6px 14px" }}
+                                  >
+                                    Ajustar duración a {minDurationLabel}
+                                  </button>
                                 </>
                               ) : (
                                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -2249,7 +2428,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                                 ? "No disponible"
                                 : overnightBlocked
                                   ? "Solo por horas"
-                                  : "Elegir esta"}
+                                  : durationBlocked
+                                    ? `Mínimo ${minDurationLabel}`
+                                    : "Elegir esta"}
                             </button>
                           </div>
                         </div>
@@ -2529,9 +2710,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
                         <MessageCircle size={16} /> Consulta por WhatsApp
                       </a>
                     )}
-                    {CONTACTS[building]?.phones[1] && (
+                    {(CONTACTS[building]?.phones[1] ?? CONTACTS[building]?.phones[0]) && (
                       <a
-                        href={CONTACTS[building].phones[1].href}
+                        href={(CONTACTS[building].phones[1] ?? CONTACTS[building].phones[0]).href}
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -3077,6 +3258,104 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
       <SiteFooter />
 
       <CookieConsent />
+
+      {/* Special per-room booking conditions notice (e.g. Bali Deluxe). Must be
+          accepted ("Acepto") before the visitor can start booking the room. */}
+      {conditionsRoom &&
+        (() => {
+          const cond = specialConditionsFor(conditionsRoom);
+          if (!cond) return null;
+          return (
+            <Dialog
+              open
+              onOpenChange={(o) => {
+                if (!o) setConditionsRoom(null);
+              }}
+            >
+              <DialogContent
+                className="max-h-[85vh] overflow-y-auto sm:max-w-xl"
+                // The dialog renders in a portal OUTSIDE .rm-page, where the
+                // brand palette variables aren't defined. Re-declare the ones the
+                // buttons below use so the insignia-red colours resolve correctly.
+                style={
+                  {
+                    "--blood": "#731423",
+                    "--blood-light": "#8b1027",
+                    "--blood-dark": "#5c0f1c",
+                    "--ink-soft": "#7a7066",
+                    "--border-strong": "rgba(115,20,35,0.42)",
+                  } as CSSProperties
+                }
+              >
+                <DialogHeader>
+                  <DialogTitle style={{ color: "#731423" }}>{cond.title}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 text-sm leading-relaxed text-muted-foreground">
+                  <p className="font-semibold text-foreground">{cond.intro}</p>
+                  <ul className="list-disc space-y-2 pl-5">
+                    {cond.items.map((it) => (
+                      <li key={it.label}>
+                        <span className="font-semibold text-foreground">{it.label}:</span>{" "}
+                        {it.text}
+                      </li>
+                    ))}
+                  </ul>
+                  {cond.footer && <p>{cond.footer}</p>}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    justifyContent: "flex-end",
+                    flexWrap: "wrap",
+                    marginTop: 8,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setConditionsRoom(null)}
+                    style={{
+                      background: "transparent",
+                      border: "1px solid var(--border-strong)",
+                      borderRadius: 10,
+                      padding: "0 22px",
+                      height: 48,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      color: "var(--blood)",
+                      fontFamily: "'Noto Sans', sans-serif",
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={acceptConditions}
+                    style={{
+                      background: "linear-gradient(180deg, var(--blood-light) 0%, var(--blood) 100%)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 10,
+                      padding: "0 30px",
+                      height: 48,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      fontFamily: "'Noto Sans', sans-serif",
+                    }}
+                  >
+                    Acepto
+                  </button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          );
+        })()}
     </div>
   );
 }

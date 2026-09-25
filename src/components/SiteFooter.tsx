@@ -7,9 +7,9 @@ import "./siteChrome.css";
 const SITE = "https://www.roomsmadrid.es";
 
 const PHONES = [
-  { hotel: "Ventas", number: "91 060 34 81", href: "tel:+34910603481" },
-  { hotel: "Bernabéu", number: "910 076 100", href: "tel:+34910076100" },
-  { hotel: "América", number: "605 472 600", href: "tel:+34605472600" },
+  { hotel: "Ventas", number: "910 076 100", href: "tel:+34910076100" },
+  { hotel: "Bernabéu", number: "605 472 600", href: "tel:+34605472600" },
+  { hotel: "América", number: "910 603 481", href: "tel:+34910603481" },
 ];
 
 const LEGAL = [

@@ -431,12 +431,14 @@ Deno.serve(async (req) => {
         const { error: redeemErr } = await supabase.rpc("redeem_promo_code", { p_id: reservation.promo_code_id });
         if (redeemErr) console.warn("create-redsys-payment: bypass promo redeem failed", redeemErr);
       }
-      try {
-        await supabase.functions.invoke("send-reservation-confirmation", {
-          body: { reservation_id },
-        });
-      } catch (e) {
-        console.warn("create-redsys-payment: bypass email failed", e);
+      // `functions.invoke` no lanza en 500: hay que mirar `error` (ver redsys-notification).
+      const { error: mailErr } = await supabase.functions.invoke("send-reservation-confirmation", {
+        body: { reservation_id },
+      });
+      if (mailErr) {
+        let detail = "";
+        try { detail = await (mailErr as { context?: Response }).context?.text() ?? ""; } catch { /* sin body */ }
+        console.warn("create-redsys-payment: bypass email failed", mailErr.message, detail.slice(0, 500));
       }
       return json({ bypass: true, redirectUrl: urlOkBypass });
     }

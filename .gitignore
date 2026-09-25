@@ -46,3 +46,6 @@ docs/contexto-claude-app.md
 docs/parte-horas-2026-06-22.md
 Informe_Horas_RoomsMadrid.pdf
 informe_horas_roomsmadrid.py
+
+# Dataset ML (datos de negocio, se regenera con ml/export_reservations_dataset.mjs)
+ml/dataset/

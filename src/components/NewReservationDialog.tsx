@@ -274,6 +274,14 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
       }
       if (!isAdmin && isOvernight && (breakdown?.base ?? 0) <= 0)
         throw new Error("Tarifa de noche completa no configurada");
+      // Igual por horas: las salas premium (p.ej. Bali Deluxe) sólo tienen
+      // precio a partir de cierta duración; por debajo, `calculatePrice`
+      // devuelve base 0 € y la reserva se guardaba sin importe. El admin puede
+      // seguir forzando un total manual (`canOverride`).
+      if (!isAdmin && !isOvernight && (breakdown?.base ?? 0) <= 0)
+        throw new Error(
+          "Esta habitación no tiene tarifa para esa duración (revisa su duración mínima)",
+        );
       if (isPublic && (!customerName || !customerEmail)) {
         throw new Error("Nombre y email son obligatorios");
       }
@@ -413,21 +421,29 @@ setDate(format(d, "yyyy-MM-dd"));    const hh = String(d.getHours()).padStart(2,
         if (e2) throw e2;
       }
 
-      // Trigger confirmation email when public booking with email
+      // Trigger confirmation email when public booking with email.
+      // `functions.invoke` no lanza en 500: devuelve { error }.
+      let emailSent = false;
       if (isPublic && !isEdit && customerEmail) {
-        try {
-          await supabase.functions.invoke("send-reservation-confirmation", {
-            body: { reservation_id: reservationId },
-          });
-        } catch (e) {
-          console.warn("email send failed", e);
-        }
+        const { error: mailErr } = await supabase.functions.invoke("send-reservation-confirmation", {
+          body: { reservation_id: reservationId },
+        });
+        if (mailErr) console.warn("email send failed", mailErr);
+        emailSent = !mailErr;
       }
 
-      return reservationId;
+      return { id: reservationId, emailSent };
     },
-    onSuccess: (id) => {
-      toast.success(isEdit ? "Reserva actualizada" : isPublic ? "¡Reserva confirmada! Te hemos enviado un email." : "Reserva creada");
+    onSuccess: ({ id, emailSent }) => {
+      toast.success(
+        isEdit
+          ? "Reserva actualizada"
+          : isPublic
+            ? emailSent
+              ? "¡Reserva confirmada! Te hemos enviado un email."
+              : "¡Reserva confirmada! No hemos podido enviarte el email de confirmación."
+            : "Reserva creada",
+      );
       qc.invalidateQueries({ queryKey: ["reservations"] });
       onOpenChange(false);
       if (isPublic) onPublicCreated?.(id);

@@ -80,6 +80,12 @@ Tarifa por horas de un grupo.
 - `price_with_jacuzzi` numeric(10,2) — null si no aplica
 - `price_without_jacuzzi` numeric(10,2)
 - **unique (rate_group_id, duration_min)**
+- ⚠️ Una fila puede existir con **precio NULL**: significa "ese tramo no se vende"
+  en ese grupo, no "gratis". `pricing.ts` hace `?? 0`, así que reservar ese tramo
+  producía una reserva de **0 €**. Caso real: **Bali Deluxe** sólo tiene precio en
+  180/240/300/360 (140/160/180/190 €) → **mínimo 3 h**. La web pública deriva de
+  aquí la duración mínima por sala (`minDurationByRoom` en `reservar.tsx`) y
+  bloquea los tramos sin precio; el panel lo rechaza salvo override de admin.
 
 ### `rate_overnight`
 Tarifa de noche completa (solo dom–mié de entrada; la disponibilidad la impone la app).
@@ -103,6 +109,12 @@ Reglas de precio dinámico (ocupación o fecha).
 Catálogo de extras.
 - `id` uuid PK · `category` `extra_category` · `name` text · `price` numeric(10,2) ·
   `description` text · `active` bool default true · `sort_order` int · `created_at`
+- `name` NO es unique (las migraciones que insertan comprueban `where not exists`).
+- No hay relación extra↔sala: la restricción "este extra sólo en X sala" vive en la
+  web pública (`extraAvailableForRoom` en `reservar.tsx`, por regex de nombre +
+  mapa de salas). Casos: columpio (`/colump/`), cubo LED (`/cubo/`+`/led/`) y
+  **camilla de masajes** (`/camilla/`, sólo Bali Deluxe, 15 €, `20260916120000`).
+  El panel interno no filtra: muestra todos los extras en todas las salas.
 
 ### `gift_thresholds`
 Regalo automático al superar un gasto en extras.
@@ -132,6 +144,7 @@ Tabla central.
 - `cleaning_minutes` int default 15 *(buffer de limpieza, `20260601150000`)*
 - `promo_code_id` uuid → `promo_codes(id)` ON DELETE SET NULL · `discount_amount` numeric default 0 *(`20260610120000`)*
 - `cancellation_reason` text *(`20260622140000`)*
+- `confirmation_email_sent_at` timestamptz · `confirmation_email_error` text *(seguimiento del email de confirmación; solo los escribe la edge function `send-reservation-confirmation`, `20260920220000`)*
 - `created_by` uuid → `auth.users(id)` · `created_at` · `updated_at` (trigger `set_updated_at`)
 - indexes: `(room_id, start_at, end_at)`, `(start_at)`
 

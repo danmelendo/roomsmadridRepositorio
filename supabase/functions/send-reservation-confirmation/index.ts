@@ -3,7 +3,13 @@
 // Secrets necesarios (Supabase → Edge Functions → Secrets):
 //   SMTP_HOST, SMTP_PORT (465 SSL / 587 STARTTLS), SMTP_TLS ("true"/"false"),
 //   SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+//
+// Body: { reservation_id }. Cada envío deja rastro en
+// `reservations.confirmation_email_sent_at` / `confirmation_email_error`
+// (migración 20260920220000). El reenvío de las confirmaciones que no llegaron
+// se lanza desde `scripts/resend-confirmations.mjs`, que selecciona las
+// reservas por esas columnas y llama aquí una a una.
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
@@ -13,24 +19,44 @@ const corsHeaders = {
 };
 
 interface Body {
-  reservation_id: string;
+  reservation_id?: string;
 }
+
+type SendResult =
+  | { ok: true; via: "smtp" }
+  | { ok: true; skipped: "no_email" | "no_smtp" }
+  | { ok: false; error: string };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { reservation_id } = (await req.json()) as Body;
-    if (!reservation_id) throw new Error("reservation_id required");
-
+    const body = (await req.json()) as Body;
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    if (!body.reservation_id) throw new Error("reservation_id required");
+    const result = await sendConfirmation(supabase, body.reservation_id);
+    if (!result.ok) return json({ error: result.error }, 500);
+    return json(result);
+  } catch (e) {
+    console.error(e);
+    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+  }
+});
+
+/**
+ * Envía el email de confirmación de UNA reserva y anota el resultado en
+ * `confirmation_email_sent_at` / `confirmation_email_error`. Nunca lanza:
+ * cualquier fallo (reserva inexistente, SMTP, etc.) vuelve como { ok: false }.
+ */
+async function sendConfirmation(supabase: SupabaseClient, reservationId: string): Promise<SendResult> {
+  try {
     const { data: r, error } = await supabase
       .from("reservations")
       .select("*, rooms(name,building), customers(name,email)")
-      .eq("id", reservation_id)
+      .eq("id", reservationId)
       .maybeSingle();
     if (error) throw error;
     if (!r) throw new Error("Reserva no encontrada");
@@ -38,12 +64,12 @@ Deno.serve(async (req) => {
     const { data: extraRows } = await supabase
       .from("reservation_extras")
       .select("qty, is_gift, bed_message, screen_message, extras(name)")
-      .eq("reservation_id", reservation_id);
+      .eq("reservation_id", reservationId);
 
     const email: string | null = r.customers?.email ?? null;
     if (!email) {
-      console.log("No customer email; skipping send");
-      return json({ ok: true, skipped: "no_email" });
+      console.log("No customer email; skipping send", reservationId);
+      return { ok: true, skipped: "no_email" };
     }
 
     const eur = (n: number) =>
@@ -75,8 +101,8 @@ Deno.serve(async (req) => {
 
     const smtpHost = Deno.env.get("SMTP_HOST");
     if (!smtpHost) {
-      console.log("SMTP_HOST no configurado; no se envía. Destinatario:", email);
-      return json({ ok: true, skipped: "no_smtp" });
+      console.log("SMTP_HOST no configurado; no se envía. Reserva:", reservationId);
+      return { ok: true, skipped: "no_smtp" };
     }
 
     const client = new SMTPClient({
@@ -104,12 +130,23 @@ Deno.serve(async (req) => {
       await client.close();
     }
 
-    return json({ ok: true, via: "smtp" });
+    await supabase
+      .from("reservations")
+      .update({ confirmation_email_sent_at: new Date().toISOString(), confirmation_email_error: null })
+      .eq("id", reservationId);
+    return { ok: true, via: "smtp" };
   } catch (e) {
-    console.error(e);
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("send-reservation-confirmation: fallo en reserva", reservationId, message);
+    // Best effort: dejar el error en la reserva para poder reenviar después.
+    const { error: markErr } = await supabase
+      .from("reservations")
+      .update({ confirmation_email_error: message.slice(0, 500) })
+      .eq("id", reservationId);
+    if (markErr) console.warn("send-reservation-confirmation: no se pudo anotar el error", markErr);
+    return { ok: false, error: message };
   }
-});
+}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
