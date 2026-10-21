@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -73,6 +74,31 @@ export function useRooms() {
       return data;
     },
   });
+}
+
+// Keeps every ["reservations", ...] query (calendar, today, list) in sync with
+// changes made from other devices/hotels or the public web, instead of waiting
+// for the 30 s polling. Bursts of events are coalesced into one refetch.
+export function useReservationsLiveSync(enabled: boolean) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!enabled) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const channel = supabase
+      .channel("pms-reservations-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => qc.invalidateQueries({ queryKey: ["reservations"] }), 300);
+      })
+      .subscribe((status) => {
+        // After a reconnect (PC asleep, wifi drop) we may have missed events.
+        if (status === "SUBSCRIBED") qc.invalidateQueries({ queryKey: ["reservations"] });
+      });
+    return () => {
+      clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [enabled, qc]);
 }
 
 export function useExtras() {

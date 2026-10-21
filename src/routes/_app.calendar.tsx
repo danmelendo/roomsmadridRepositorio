@@ -49,6 +49,7 @@ function CalendarPage() {
       return data;
     },
     refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const shiftDay = (delta: number) => {

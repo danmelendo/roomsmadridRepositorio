@@ -39,6 +39,7 @@ function TodayPage() {
       return data;
     },
     refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const updateStatus = useMutation({

@@ -42,6 +42,7 @@ function ReservationsPage() {
       if (error) throw error;
       return data;
     },
+    refetchOnWindowFocus: true,
   });
 
   const cancel = useMutation({

@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/lib/auth";
+import { useReservationsLiveSync } from "@/lib/data";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { session, loading } = useAuth();
+  useReservationsLiveSync(!!session);
   if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Cargando…</div>;
   if (!session) return <Navigate to="/login" />;
 
