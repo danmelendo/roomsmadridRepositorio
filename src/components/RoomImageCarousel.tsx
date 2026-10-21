@@ -44,7 +44,10 @@ export function RoomImageCarousel({
   return (
     <div style={{ position: "relative", width: "100%", height, overflow: "hidden", background: "#000" }}>
       {images.map((src, idx) => (
-        <img
+        // Only the visible photo and its neighbours are mounted: stacked
+        // opacity-0 <img>s still download, so mounting all of them fetched
+        // every photo of every room at once.
+        isNear(idx, i, images.length) && <img
           key={src}
           src={src}
           alt={alt}
@@ -111,6 +114,12 @@ export function RoomImageCarousel({
       </div>
     </div>
   );
+}
+
+/** True for the current slide and the ones right before/after it (wrapping). */
+export function isNear(idx: number, current: number, length: number) {
+  const d = Math.abs(idx - current);
+  return d <= 1 || d === length - 1;
 }
 
 function arrowStyle(side: "left" | "right"): React.CSSProperties {

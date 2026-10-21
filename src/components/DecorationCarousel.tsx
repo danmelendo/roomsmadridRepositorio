@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isNear } from "@/components/RoomImageCarousel";
 
 /**
  * Auto-advancing photo carousel for the decoration extras (real uploaded
@@ -26,7 +27,7 @@ export function DecorationCarousel({
   return (
     <div style={{ position: "relative", width: "100%", height, overflow: "hidden", background: "#000" }}>
       {images.map((src, idx) => (
-        <img
+        isNear(idx, i, images.length) && <img
           key={src}
           src={src}
           alt="Decoración"
