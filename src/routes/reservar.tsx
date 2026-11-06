@@ -438,7 +438,7 @@ const EXTRA_CATEGORY_LABELS: Record<string, string> = {
 };
 
 // Decorations above the basic "Especial" (20 €) — i.e. Plus (30 €), Premium
-// (50 €) and Premium Deluxe (145 €) — include personalised phrases that staff
+// (45 €) and Premium Deluxe (145 €) — include personalised phrases that staff
 // set up in the room, so the customer must enter them when selecting one.
 const DECORATION_FREE_MESSAGE_MAX_PRICE = 20;
 const BED_MESSAGE_MAX_WORDS = 2;
@@ -446,6 +446,17 @@ const SCREEN_MESSAGE_MAX_WORDS = 10;
 
 function decorationNeedsMessage(ex: ExtraLite) {
   return ex.category === "decoration" && Number(ex.price) > DECORATION_FREE_MESSAGE_MAX_PRICE;
+}
+
+// Premium y Premium Deluxe ya no incluyen el mensaje en la pantalla LED: se
+// vende y se pide en un extra aparte. En las salas con pantalla sólo piden la
+// frase de la cama; el mensaje en el cristal y en el cubo LED se mantienen.
+function decorationAsksSurfaceMessage(
+  ex: ExtraLite,
+  r: { name: string; building: string } | null | undefined,
+): boolean {
+  if (!r || !/premium/i.test(ex.name)) return true;
+  return hasLedCube(r) || !hasScreen(r);
 }
 
 // Debug discount code: reduces the total by 99.9% so the Redsys deposit drops to
@@ -1757,7 +1768,9 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
             unit_price: Number(ex?.price ?? 0),
             is_gift: false,
             bed_message: msg?.bed.trim() || null,
-            screen_message: msg?.screen.trim() || null,
+            screen_message: decorationAsksSurfaceMessage(ex, room)
+              ? msg?.screen.trim() || null
+              : null,
           };
         })
         .filter(
@@ -1940,11 +1953,13 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     for (const ex of selectedDecoNeedingMessage) {
       const m = decoMessages[ex.id] ?? { bed: "", screen: "" };
       const surfaceLabel = room ? messageSurfaceLabel(room).toLowerCase() : "mensaje en el cristal";
-      if (!m.bed.trim() || !m.screen.trim())
+      const asksSurface = decorationAsksSurfaceMessage(ex, room);
+      if (!asksSurface && !m.bed.trim()) return `Escribe la frase de la cama para «${ex.name}»`;
+      if (asksSurface && (!m.bed.trim() || !m.screen.trim()))
         return `Escribe la frase de la cama y el ${surfaceLabel} para «${ex.name}»`;
       if (countWords(m.bed) > BED_MESSAGE_MAX_WORDS)
         return `La frase en la cama de «${ex.name}» admite máximo ${BED_MESSAGE_MAX_WORDS} palabras`;
-      if (countWords(m.screen) > SCREEN_MESSAGE_MAX_WORDS)
+      if (asksSurface && countWords(m.screen) > SCREEN_MESSAGE_MAX_WORDS)
         return `El ${surfaceLabel} de «${ex.name}» admite máximo ${SCREEN_MESSAGE_MAX_WORDS} palabras`;
     }
     return null;
@@ -1963,6 +1978,7 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
     const surfaceLabel = effectiveRoom
       ? messageSurfaceLabel(effectiveRoom)
       : "Mensaje en el cristal";
+    const asksSurface = decorationAsksSurfaceMessage(ex, effectiveRoom);
     return (
       <div className="rm-deco-msg" onClick={(e) => e.stopPropagation()}>
         <div className="rm-deco-msg-field">
@@ -1982,23 +1998,25 @@ export function PublicReservePage({ initialSlug }: { initialSlug?: string } = {}
             </span>
           )}
         </div>
-        <div className="rm-deco-msg-field">
-          <label className="rm-deco-msg-label">
-            {surfaceLabel} (máx. {SCREEN_MESSAGE_MAX_WORDS} palabras) *
-          </label>
-          <input
-            className={`rm-deco-msg-input${screenOver ? " rm-invalid" : ""}`}
-            value={m.screen}
-            maxLength={120}
-            placeholder="Ej. Feliz aniversario mi amor"
-            onChange={(e) => setDecoMessage(ex.id, "screen", e.target.value)}
-          />
-          {screenOver && (
-            <span className="rm-deco-msg-hint rm-over">
-              Máximo {SCREEN_MESSAGE_MAX_WORDS} palabras
-            </span>
-          )}
-        </div>
+        {asksSurface && (
+          <div className="rm-deco-msg-field">
+            <label className="rm-deco-msg-label">
+              {surfaceLabel} (máx. {SCREEN_MESSAGE_MAX_WORDS} palabras) *
+            </label>
+            <input
+              className={`rm-deco-msg-input${screenOver ? " rm-invalid" : ""}`}
+              value={m.screen}
+              maxLength={120}
+              placeholder="Ej. Feliz aniversario mi amor"
+              onChange={(e) => setDecoMessage(ex.id, "screen", e.target.value)}
+            />
+            {screenOver && (
+              <span className="rm-deco-msg-hint rm-over">
+                Máximo {SCREEN_MESSAGE_MAX_WORDS} palabras
+              </span>
+            )}
+          </div>
+        )}
       </div>
     );
   };
